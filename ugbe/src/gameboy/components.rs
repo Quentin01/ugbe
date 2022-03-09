@@ -18,6 +18,7 @@ pub trait InterruptLine {
 
 #[derive(Debug)]
 pub struct MmuContext<'components> {
+    pub joypad: &'components mut super::joypad::Joypad,
     pub ppu: &'components mut super::ppu::Ppu,
     pub timer: &'components mut super::timer::Timer,
     pub interrupt: &'components mut super::interrupt::Interrupt,

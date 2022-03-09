@@ -24,7 +24,7 @@ impl super::components::Mmu for Mmu {
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000],
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000],
             0xFE00..=0xFE9F => ctx.ppu.read_oam_byte(address - 0xFE00),
-            0xFF00 => 0xCF, // TODO: Joypad input
+            0xFF00 => ctx.joypad.read_p1(),
             0xFF04 => ctx.timer.read_div(),
             0xFF05 => ctx.timer.read_tima(),
             0xFF06 => ctx.timer.read_tma(),
@@ -76,6 +76,7 @@ impl super::components::Mmu for Mmu {
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000] = value,
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000] = value,
             0xFE00..=0xFE9F => ctx.ppu.write_oam_byte(address - 0xFE00, value),
+            0xFF00 => ctx.joypad.write_p1(value),
             0xFF04 => ctx.timer.write_div(value),
             0xFF05 => ctx.timer.write_tima(value),
             0xFF06 => ctx.timer.write_tma(value),

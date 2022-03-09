@@ -21,6 +21,9 @@ const TEXTURE_PITCH: usize = (TEXTURE_WIDTH * BYTES_PER_PIXEL) as usize;
 fn main() -> Result<(), io::Error> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+    let game_controller_subsystem = sdl_context.game_controller().unwrap();
+
+    let mut controllers = vec![];
 
     let window = video_subsystem
         .window("UGBE", TEXTURE_WIDTH, TEXTURE_HEIGHT)
@@ -64,6 +67,74 @@ fn main() -> Result<(), io::Error> {
                     keycode: Some(sdl2::keyboard::Keycode::Escape),
                     ..
                 } => break 'running,
+                sdl2::event::Event::ControllerDeviceAdded { which, .. } => {
+                    if let Ok(controller) = game_controller_subsystem.open(which) {
+                        println!("Successfully added controller '{}'", controller.name());
+                        controllers.push(controller);
+                    } else {
+                        println!("Failed to open the added controller with index = {}", which);
+                    }
+                }
+                sdl2::event::Event::ControllerDeviceRemoved { which, .. } => {
+                    let idx = controllers
+                        .iter()
+                        .position(move |controller| controller.instance_id() == which);
+
+                    match idx {
+                        Some(idx) => {
+                            println!(
+                                "Successfully removed controller '{}'",
+                                controllers[idx].name()
+                            );
+                            controllers.remove(idx);
+                        }
+                        None => {}
+                    }
+                }
+                sdl2::event::Event::ControllerButtonUp { button, .. } => match button {
+                    sdl2::controller::Button::A => gameboy.keyup(gameboy::joypad::Button::A),
+                    sdl2::controller::Button::B => gameboy.keyup(gameboy::joypad::Button::B),
+                    sdl2::controller::Button::Start => {
+                        gameboy.keyup(gameboy::joypad::Button::Start)
+                    }
+                    sdl2::controller::Button::Back => {
+                        gameboy.keyup(gameboy::joypad::Button::Select)
+                    }
+                    sdl2::controller::Button::DPadUp => gameboy.keyup(gameboy::joypad::Button::Up),
+                    sdl2::controller::Button::DPadDown => {
+                        gameboy.keyup(gameboy::joypad::Button::Down)
+                    }
+                    sdl2::controller::Button::DPadLeft => {
+                        gameboy.keyup(gameboy::joypad::Button::Left)
+                    }
+                    sdl2::controller::Button::DPadRight => {
+                        gameboy.keyup(gameboy::joypad::Button::Right)
+                    }
+                    _ => {}
+                },
+                sdl2::event::Event::ControllerButtonDown { button, .. } => match button {
+                    sdl2::controller::Button::A => gameboy.keydown(gameboy::joypad::Button::A),
+                    sdl2::controller::Button::B => gameboy.keydown(gameboy::joypad::Button::B),
+                    sdl2::controller::Button::Start => {
+                        gameboy.keydown(gameboy::joypad::Button::Start)
+                    }
+                    sdl2::controller::Button::Back => {
+                        gameboy.keydown(gameboy::joypad::Button::Select)
+                    }
+                    sdl2::controller::Button::DPadUp => {
+                        gameboy.keydown(gameboy::joypad::Button::Up)
+                    }
+                    sdl2::controller::Button::DPadDown => {
+                        gameboy.keydown(gameboy::joypad::Button::Down)
+                    }
+                    sdl2::controller::Button::DPadLeft => {
+                        gameboy.keydown(gameboy::joypad::Button::Left)
+                    }
+                    sdl2::controller::Button::DPadRight => {
+                        gameboy.keydown(gameboy::joypad::Button::Right)
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         }

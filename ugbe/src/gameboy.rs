@@ -6,6 +6,7 @@ mod cartbridge;
 mod components;
 mod cpu;
 mod interrupt;
+pub mod joypad;
 mod mmu;
 mod ppu;
 mod timer;
@@ -46,6 +47,7 @@ impl GameboyBuilder {
             mmu: mmu::Mmu::new(),
             boot_rom: self.boot_rom,
             cartbridge: self.cartbridge,
+            joypad: joypad::Joypad::new(),
             ppu: ppu::Ppu::new(),
             cpu: cpu::Cpu::new(),
             bus: bus::Bus::new(),
@@ -61,6 +63,7 @@ pub struct Gameboy {
     mmu: mmu::Mmu,
     boot_rom: bootrom::BootRom,
     cartbridge: cartbridge::Cartbridge,
+    joypad: joypad::Joypad,
     ppu: ppu::Ppu,
     cpu: cpu::Cpu,
     bus: bus::Bus,
@@ -80,6 +83,7 @@ impl Gameboy {
                 memory_operation,
                 &mut self.mmu,
                 &mut components::MmuContext {
+                    joypad: &mut self.joypad,
                     ppu: &mut self.ppu,
                     timer: &mut self.timer,
                     interrupt: &mut self.interrupt,
@@ -92,10 +96,19 @@ impl Gameboy {
 
         let screen_event = self.ppu.tick(&mut self.interrupt);
         self.timer.tick(&mut self.interrupt);
+        self.joypad.tick(&mut self.interrupt);
 
         self.t_cycle_count = self.t_cycle_count.wrapping_add(1);
 
         screen_event
+    }
+
+    pub fn keydown(&mut self, button: joypad::Button) {
+        self.joypad.keydown(button)
+    }
+
+    pub fn keyup(&mut self, button: joypad::Button) {
+        self.joypad.keyup(button)
     }
 
     pub fn screen(&self) -> &screen::Screen {
