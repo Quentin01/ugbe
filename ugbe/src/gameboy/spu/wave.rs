@@ -87,7 +87,7 @@ impl WaveVoice {
         };
 
         let sample = ((amp as i32) << shift_to_avoid_precision) >> volume_shift;
-        sample - (0xF << (shift_to_avoid_precision - 1))
+        (sample * 2) - (((0xF * 2) << shift_to_avoid_precision) / 2)
     }
 
     pub fn read_register_0(&self) -> u8 {
