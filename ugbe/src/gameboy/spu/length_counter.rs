@@ -7,7 +7,7 @@ pub struct LengthCounter<const NB_BITS: u8> {
 }
 
 impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
-    const MAX_LENGTH: u16 = 1 << (NB_BITS + 1);
+    const MAX_LENGTH: u16 = 1 << NB_BITS;
     const VALUE_MASK: u8 = (Self::MAX_LENGTH - 1) as u8;
 
     pub fn new() -> Self {

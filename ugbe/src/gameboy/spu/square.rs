@@ -79,6 +79,7 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         if FREQUENCY_SWEEP {
             self.frequency_sweep.trigger();
         }
+
         self.cycle_count = 0;
     }
 
