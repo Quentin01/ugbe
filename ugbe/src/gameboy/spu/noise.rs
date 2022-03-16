@@ -8,13 +8,13 @@ pub struct NoiseVoice {
     frame_sequencer: FrameSequencer,
 
     length_counter: LengthCounter<6>,
-    stop_after_length_counter: bool,
+    length_counter_enabled: bool,
 
     volume_envelope: VolumeEnvelope,
 
     frequency_div: u8,
     frequency_div_shift: u8,
-    cycle_count: usize,
+    frequency_timer: usize,
 
     counter_width: u8,
     lfsr: u16,
@@ -27,13 +27,13 @@ impl NoiseVoice {
             frame_sequencer: FrameSequencer::new(),
 
             length_counter: LengthCounter::new(),
-            stop_after_length_counter: false,
+            length_counter_enabled: false,
 
             volume_envelope: VolumeEnvelope::new(),
 
             frequency_div: 0,
             frequency_div_shift: 0,
-            cycle_count: 0,
+            frequency_timer: 0,
 
             counter_width: 0,
             lfsr: 0,
@@ -47,27 +47,28 @@ impl NoiseVoice {
 
         self.frame_sequencer.tick();
 
-        self.length_counter.tick(&self.frame_sequencer);
-        if self.length_counter.value() == 0 && self.stop_after_length_counter {
-            self.enabled = false;
+        if self.length_counter_enabled {
+            self.length_counter.tick(&self.frame_sequencer);
+            if self.length_counter.value() == 0 {
+                self.enabled = false;
+            }
         }
 
         self.volume_envelope.tick(&self.frame_sequencer);
 
-        self.cycle_count += 1;
-        let frequency_timer: usize = match self.frequency_div {
-            0 => 8,
-            1 => 16,
-            2 => 32,
-            3 => 48,
-            4 => 64,
-            5 => 80,
-            6 => 96,
-            7 => 112,
-            _ => unreachable!(),
-        } << self.frequency_div_shift;
-        if self.cycle_count > frequency_timer && frequency_timer > 0 {
-            self.cycle_count %= frequency_timer;
+        self.frequency_timer -= 1;
+        if self.frequency_timer == 0 {
+            self.frequency_timer = match self.frequency_div {
+                0 => 8,
+                1 => 16,
+                2 => 32,
+                3 => 48,
+                4 => 64,
+                5 => 80,
+                6 => 96,
+                7 => 112,
+                _ => unreachable!(),
+            } << self.frequency_div_shift;
 
             let lfsr_bit_0 = self.lfsr & 0b1;
             let lfsr_bit_1 = (self.lfsr >> 1) & 0b1;
@@ -89,11 +90,23 @@ impl NoiseVoice {
 
         self.frame_sequencer.trigger();
 
-        self.length_counter.trigger();
+        if self.length_counter_enabled {
+            self.length_counter.trigger();
+        }
 
         self.volume_envelope.trigger();
 
-        self.cycle_count = 0;
+        self.frequency_timer = match self.frequency_div {
+            0 => 8,
+            1 => 16,
+            2 => 32,
+            3 => 48,
+            4 => 64,
+            5 => 80,
+            6 => 96,
+            7 => 112,
+            _ => unreachable!(),
+        } << self.frequency_div_shift;
 
         self.lfsr = 0xFFFF;
     }
@@ -157,11 +170,11 @@ impl NoiseVoice {
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b10000000 | ((self.stop_after_length_counter as u8) << 6) | 0b00111111
+        0b10000000 | ((self.length_counter_enabled as u8) << 6) | 0b00111111
     }
 
     pub fn write_register_4(&mut self, value: u8) {
-        self.stop_after_length_counter = (value >> 6) & 0b1 == 1;
+        self.length_counter_enabled = (value >> 6) & 0b1 == 1;
 
         if (value >> 7) & 0b1 == 1 {
             self.trigger();

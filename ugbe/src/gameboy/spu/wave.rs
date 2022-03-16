@@ -7,12 +7,12 @@ pub struct WaveVoice {
     frame_sequencer: FrameSequencer,
 
     length_counter: LengthCounter<8>,
-    stop_after_length_counter: bool,
+    length_counter_enabled: bool,
 
     volume_shift: u8,
 
     frequency: u16,
-    cycle_count: usize,
+    frequency_timer: usize,
 
     ram_idx: u8,
     ram: [u8; 16],
@@ -25,12 +25,12 @@ impl WaveVoice {
             frame_sequencer: FrameSequencer::new(),
 
             length_counter: LengthCounter::new(),
-            stop_after_length_counter: false,
+            length_counter_enabled: false,
 
             volume_shift: 0,
 
             frequency: 0,
-            cycle_count: 0,
+            frequency_timer: 2048 * 4,
 
             ram_idx: 0,
             ram: [0; 16],
@@ -44,15 +44,16 @@ impl WaveVoice {
 
         self.frame_sequencer.tick();
 
-        self.length_counter.tick(&self.frame_sequencer);
-        if self.length_counter.value() == 0 && self.stop_after_length_counter {
-            self.enabled = false;
+        if self.length_counter_enabled {
+            self.length_counter.tick(&self.frame_sequencer);
+            if self.length_counter.value() == 0 {
+                self.enabled = false;
+            }
         }
 
-        self.cycle_count += 1;
-        let frequency_timer = (2048 - self.frequency as usize) * 4;
-        if self.cycle_count > frequency_timer && frequency_timer > 0 {
-            self.cycle_count %= frequency_timer;
+        self.frequency_timer -= 1;
+        if self.frequency_timer == 0 {
+            self.frequency_timer = (2048 - self.frequency as usize) * 4;
             self.ram_idx = (self.ram_idx + 1) % 32;
         }
     }
@@ -60,9 +61,11 @@ impl WaveVoice {
     fn trigger(&mut self) {
         self.enabled = true;
 
-        self.length_counter.trigger();
+        if self.length_counter_enabled {
+            self.length_counter.trigger();
+        }
 
-        self.cycle_count = 0;
+        self.frequency_timer = (2048 - self.frequency as usize) * 4;
 
         self.ram_idx = 0;
     }
@@ -128,13 +131,13 @@ impl WaveVoice {
 
     pub fn read_register_4(&self) -> u8 {
         0b10000000
-            | ((self.stop_after_length_counter as u8) << 6)
+            | ((self.length_counter_enabled as u8) << 6)
             | 0b00111000
             | (((self.frequency >> 8) as u8) & 0b111)
     }
 
     pub fn write_register_4(&mut self, value: u8) {
-        self.stop_after_length_counter = (value >> 6) & 0b1 == 1;
+        self.length_counter_enabled = (value >> 6) & 0b1 == 1;
         self.frequency = (((value & 0b111) as u16) << 8) | self.frequency & 0xFF;
 
         if (value >> 7) & 0b1 == 1 {
