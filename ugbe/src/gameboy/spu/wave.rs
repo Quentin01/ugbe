@@ -61,6 +61,10 @@ impl WaveVoice {
         self.enabled = true;
 
         self.length_counter.trigger();
+
+        self.cycle_count = 0;
+
+        self.ram_idx = 0;
     }
 
     pub fn enabled(&self) -> bool {
