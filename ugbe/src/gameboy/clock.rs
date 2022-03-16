@@ -1,6 +1,5 @@
 pub const FREQUENCY: usize = 4_194_304;
-const T_CYCLE_DURATION: std::time::Duration =
-    std::time::Duration::new(0, (1_000_000_000f64 / FREQUENCY as f64) as u32);
+const NANOS_PER_T_CYCLE: f64 = 1_000_000_000f64 / FREQUENCY as f64;
 
 pub struct Clock {
     t_cycle_count: usize,
@@ -26,6 +25,7 @@ impl Clock {
     pub fn now(&self) -> Instant {
         Instant {
             t_cycle_count: self.t_cycle_count,
+            extra_nano_seconds: 0.0f64,
         }
     }
 }
@@ -33,12 +33,26 @@ impl Clock {
 #[derive(Clone, Copy)]
 pub struct Instant {
     t_cycle_count: usize,
+    extra_nano_seconds: f64,
 }
 
 impl Instant {
-    pub fn elapsed(&self, clock: &Clock) -> std::time::Duration {
-        // FIXME: We could have already wrap
+    pub fn restart(&mut self, clock: &Clock) -> std::time::Duration {
+        let elapsed_t_cycles = if clock.t_cycle_count > self.t_cycle_count {
+            clock.t_cycle_count - self.t_cycle_count
+        } else {
+            usize::MAX - self.t_cycle_count + clock.t_cycle_count
+        };
+
         assert!(clock.t_cycle_count >= self.t_cycle_count);
-        T_CYCLE_DURATION * (clock.t_cycle_count - self.t_cycle_count) as u32
+
+        let nano_seconds_duration =
+            NANOS_PER_T_CYCLE * elapsed_t_cycles as f64 + self.extra_nano_seconds;
+        let nano_seconds_duration_int = nano_seconds_duration as u32;
+
+        self.extra_nano_seconds = nano_seconds_duration - nano_seconds_duration_int as f64;
+        self.t_cycle_count = clock.t_cycle_count;
+
+        std::time::Duration::new(0, nano_seconds_duration_int)
     }
 }

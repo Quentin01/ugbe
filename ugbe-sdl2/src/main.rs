@@ -137,8 +137,6 @@ fn main() -> Result<()> {
         .map_err(SdlError)
         .context("unable to init SDL2 audio queue")?;
 
-    audio_queue.resume();
-
     let mut audio_buff_left = blip_buf::BlipBuf::new((SAMPLE_COUNT_PER_EVENT * 10) as u32);
     let mut audio_buff_right = blip_buf::BlipBuf::new((SAMPLE_COUNT_PER_EVENT * 10) as u32);
 
@@ -158,6 +156,8 @@ fn main() -> Result<()> {
 
     let emulation_thread =
         { std::thread::spawn(|| run_emulation(gameboy, sender_internal, receiver_external)) };
+
+    audio_queue.resume();
 
     'running: loop {
         for event in event_pump.poll_iter() {
@@ -319,14 +319,14 @@ fn run_emulation(
     let mut sample_frames_idx = 0;
     let mut sample_frames = [gameboy::spu::SampleFrame::default(); SAMPLE_COUNT_PER_EVENT];
 
+    let mut before_emulation = gameboy.clock().now();
+
     let mut lag_duration = std::time::Duration::new(0, 0);
     let mut before_frame = std::time::Instant::now();
 
     'running: loop {
         // Run the emulation until we need to display another frame
         let expected_frame_duration = {
-            let before_emulation = gameboy.clock().now();
-
             // Deal with external events
             for event in external_events.try_iter() {
                 match event {
@@ -365,7 +365,7 @@ fn run_emulation(
                 }
             }
 
-            before_emulation.elapsed(gameboy.clock())
+            before_emulation.restart(gameboy.clock())
         };
 
         // Send the new frame to the main thread
