@@ -1,95 +1,150 @@
 use super::hardware::Hardware;
 
-#[derive(Debug, Clone)]
-struct Registers {
-    a: u8,
-    b: u8,
-    c: u8,
-    d: u8,
-    e: u8,
-    f: u8,
-    h: u8,
-    l: u8,
+mod instructions;
+mod registers;
+
+#[derive(Debug, Copy, Clone)]
+struct InstructionState {
     pc: u16,
-    sp: u16,
+    condition: bool,
+    idx_mcycle: usize,
+    instruction: &'static instructions::Instruction,
 }
 
-impl Registers {
-    fn hl(&self) -> u16 {
-        (self.h as u16) << 8 | self.l as u16
-    }
-
-    fn set_hl(&mut self, value: u16) {
-        todo!()
-    }
+#[derive(Debug, Copy, Clone)]
+pub struct Cpu {
+    registers: registers::Registers,
+    instruction_state: InstructionState,
+    data_bus: u8,
 }
 
-#[derive(Debug, Clone)]
-pub struct CPU {
-    registers: Registers,
-}
-
-impl CPU {
+impl Cpu {
     pub fn new() -> Self {
+        let nop_instruction = instructions::Instruction::decode(0x0)
+            .expect("Expected NOP instruction with opcode 0x0");
+
         Self {
-            registers: Registers {
-                // TODO: Put the right default value for registers
-                a: 0x0,
-                b: 0x0,
-                c: 0x0,
-                d: 0x0,
-                e: 0x0,
-                f: 0x0,
-                h: 0x0,
-                l: 0x0,
-                pc: 0x0,
-                sp: 0x0,
+            // TODO: Put the right default value for registers
+            registers: registers::Registers::default(),
+            instruction_state: InstructionState {
+                pc: 0xFFFF,
+                condition: true,
+                instruction: nop_instruction,
+                idx_mcycle: 0,
             },
+            data_bus: 0,
         }
     }
 
     pub fn tick(&mut self, hardware: &mut Hardware) {
-        // TODO: Implement correctly instructions
-        let opcode = hardware.read_byte(self.registers.pc);
-        self.registers.pc += 1;
+        if self.instruction_state.idx_mcycle == 0 {
+            println!(
+                "Instruction: {}",
+                self.instruction_state
+                    .instruction
+                    .concrete_desc(self.instruction_state.pc, hardware)
+            );
+        }
 
-        match opcode {
-            0x21 => {
-                // LD HL, u16
-                let lsb = hardware.read_byte(self.registers.pc);
-                self.registers.pc += 1;
-
-                let msb = hardware.read_byte(self.registers.pc);
-                self.registers.pc += 1;
-
-                let immediate = (msb as u16) << 8 | lsb as u16;
-                println!("LD HL, ${:x}", immediate);
-
-                self.registers.h = msb;
-                self.registers.l = lsb;
+        let machine_cycles = match self.instruction_state.instruction.machine_cycles_operations {
+            instructions::MachineCycleOperations::Conditional { ok, not_ok, .. } => {
+                if self.instruction_state.condition {
+                    ok
+                } else {
+                    not_ok
+                }
             }
-            0x31 => {
-                // LD SP, u16
-                let lsb = hardware.read_byte(self.registers.pc);
-                self.registers.pc += 1;
+            instructions::MachineCycleOperations::NotConditional(machine_cycles) => machine_cycles,
+        };
 
-                let msb = hardware.read_byte(self.registers.pc);
-                self.registers.pc += 1;
+        let machine_cycle = machine_cycles[self.instruction_state.idx_mcycle];
+        self.instruction_state.idx_mcycle += 1;
 
-                let immediate = (msb as u16) << 8 | lsb as u16;
+        match machine_cycle.execute_operation {
+            instructions::ExecuteOperation::None => {}
+            instructions::ExecuteOperation::StoreInR8 { dst, src } => {
+                let value = match src {
+                    instructions::In8::DataBus => self.data_bus,
+                    instructions::In8::R8(reg) => self.registers.read_byte(reg),
+                    instructions::In8::Xor(a, b) => {
+                        // TODO: Set the flags
+                        self.registers.read_byte(a) ^ self.registers.read_byte(b)
+                    }
+                };
 
-                println!("LD SP, ${:x}", immediate);
-                self.registers.sp = immediate;
+                self.registers.write_byte(dst, value);
             }
-            0xAF => {
-                // XOR A
-                self.registers.a ^= self.registers.a;
+        };
 
-                println!("XOR A");
+        match machine_cycle.memory_operation {
+            instructions::MemoryOperation::None => {}
+            instructions::MemoryOperation::Read(address_bus_src) => {
+                // TODO: Avoid duplicate code
+                let address = match address_bus_src {
+                    instructions::AddressBusSource::IncrementR16(reg) => {
+                        let address = self.registers.read_word(reg);
+                        self.registers.write_word(reg, address.wrapping_add(1));
+                        address
+                    }
+                };
+
+                self.data_bus = hardware.read_byte(address);
             }
-            _ => {
-                panic!("Unknown opcode: {:x} ({:?})", opcode, self);
+            instructions::MemoryOperation::Write(address_bus_src, data_bus_src) => {
+                self.data_bus = match data_bus_src {
+                    instructions::DataBusSource::R8(reg) => self.registers.read_byte(reg),
+                };
+
+                // TODO: Avoid duplicate code
+                let address = match address_bus_src {
+                    instructions::AddressBusSource::IncrementR16(reg) => {
+                        let address = self.registers.read_word(reg);
+                        self.registers.write_word(reg, address.wrapping_add(1));
+                        address
+                    }
+                };
+
+                hardware.write_byte(address, self.data_bus)
             }
+            instructions::MemoryOperation::CBPrefix => todo!("CB prefix"),
+            instructions::MemoryOperation::PrefetchNext => {
+                // TODO: Check for interrupt during the fetch?
+                let pc = self.registers.pc;
+                let opcode = hardware.read_byte(pc);
+                self.registers.pc = self.registers.pc.wrapping_add(1);
+
+                let instruction = instructions::Instruction::decode(opcode);
+                match instruction {
+                    Some(instruction) => {
+                        self.instruction_state = match instruction.machine_cycles_operations {
+                            instructions::MachineCycleOperations::Conditional {
+                                condition, ..
+                            } => todo!(),
+                            instructions::MachineCycleOperations::NotConditional(_) => {
+                                InstructionState {
+                                    pc: pc,
+                                    condition: true,
+                                    idx_mcycle: 0,
+                                    instruction,
+                                }
+                            }
+                        };
+                    }
+                    None => panic!(
+                        "Encountered invalid instruction (0x{:x}) at 0x{:x}",
+                        opcode, pc
+                    ),
+                }
+            }
+        }
+
+        println!("\tAfter M-cycle: {:?}", self.registers);
+
+        if self.instruction_state.idx_mcycle > machine_cycles.len() {
+            panic!(
+                "The instruction {} didn't fetch the next one",
+                self.instruction_state.instruction
+            );
         }
     }
 }

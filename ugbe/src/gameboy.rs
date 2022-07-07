@@ -1,6 +1,6 @@
 use std::{fs, io, path::Path};
 
-use self::{cpu::CPU, hardware::Hardware};
+use self::{cpu::Cpu, hardware::Hardware};
 
 mod cpu;
 mod hardware;
@@ -25,7 +25,7 @@ impl GameboyBuilder {
 
     pub fn build(self) -> Gameboy {
         Gameboy {
-            cpu: CPU::new(),
+            cpu: Cpu::new(),
             hardware: Hardware::new(self.boot_rom),
         }
     }
@@ -33,7 +33,7 @@ impl GameboyBuilder {
 
 #[derive(Debug, Clone)]
 pub struct Gameboy {
-    cpu: cpu::CPU,
+    cpu: cpu::Cpu,
     hardware: Hardware,
 }
 
