@@ -1,0 +1,9 @@
+[package]
+name = "ugbe-sdl2"
+version = "0.1.0"
+edition = "2021"
+authors = ["Quentin BUATHIER <quentinbuathier@gmail.com>"]
+license = "MIT"
+
+[dependencies]
+ugbe = { version = "=0.1.0", path = "../ugbe" }

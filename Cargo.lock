@@ -5,3 +5,10 @@ version = 3
 [[package]]
 name = "ugbe"
 version = "0.1.0"
+
+[[package]]
+name = "ugbe-sdl2"
+version = "0.1.0"
+dependencies = [
+ "ugbe",
+]
