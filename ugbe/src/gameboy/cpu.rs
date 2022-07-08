@@ -11,10 +11,10 @@ pub enum In8 {
 }
 
 impl In8 {
-    pub fn read_byte(&self, cpu: &Cpu) -> u8 {
+    pub fn read_byte(&self, cpu_context: &CpuContext) -> u8 {
         match self {
-            Self::DataBus => cpu.data_bus,
-            Self::R8(reg) => cpu.registers.read_byte(*reg),
+            Self::DataBus => cpu_context.data_bus,
+            Self::R8(reg) => cpu_context.registers.read_byte(*reg),
         }
     }
 }
@@ -26,10 +26,10 @@ pub enum Out8 {
 }
 
 impl Out8 {
-    pub fn write_byte(&self, cpu: &mut Cpu, value: u8) {
+    pub fn write_byte(&self, cpu_context: &mut CpuContext, value: u8) {
         match self {
             Self::None => {}
-            Self::R8(reg) => cpu.registers.write_byte(*reg, value),
+            Self::R8(reg) => cpu_context.registers.write_byte(*reg, value),
         }
     }
 }
@@ -40,9 +40,9 @@ pub enum Out16 {
 }
 
 impl Out16 {
-    pub fn write_word(&self, cpu: &mut Cpu, value: u16) {
+    pub fn write_word(&self, cpu_context: &mut CpuContext, value: u16) {
         match self {
-            Self::R16(reg) => cpu.registers.write_word(*reg, value),
+            Self::R16(reg) => cpu_context.registers.write_word(*reg, value),
         }
     }
 }
@@ -53,9 +53,9 @@ pub enum In16 {
 }
 
 impl In16 {
-    pub fn read_word(&self, cpu: &Cpu) -> u16 {
+    pub fn read_word(&self, cpu_context: &CpuContext) -> u16 {
         match self {
-            Self::R16(reg) => cpu.registers.read_word(*reg),
+            Self::R16(reg) => cpu_context.registers.read_word(*reg),
         }
     }
 }
@@ -69,10 +69,15 @@ struct InstructionState {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Cpu {
+pub struct CpuContext {
     registers: registers::Registers,
-    instruction_state: InstructionState,
     data_bus: u8,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Cpu {
+    context: CpuContext,
+    instruction_state: InstructionState,
 }
 
 impl Cpu {
@@ -81,15 +86,17 @@ impl Cpu {
             .expect("Expected NOP instruction with opcode 0x0");
 
         Self {
-            // TODO: Put the right default value for registers
-            registers: registers::Registers::default(),
+            context: CpuContext {
+                // TODO: Put the right default value for registers
+                registers: registers::Registers::default(),
+                data_bus: 0,
+            },
             instruction_state: InstructionState {
                 pc: 0xFFFF,
                 condition: true,
                 instruction: nop_instruction,
                 idx_mcycle: 0,
             },
-            data_bus: 0,
         }
     }
 
@@ -120,39 +127,39 @@ impl Cpu {
         match machine_cycle.execute_operation {
             instructions::ExecuteOperation::None => {}
             instructions::ExecuteOperation::Store8 { dst, src } => {
-                let value = src.read_byte(self);
-                dst.write_byte(self, value);
+                let value = src.read_byte(&self.context);
+                dst.write_byte(&mut self.context, value);
             }
             instructions::ExecuteOperation::Store16 { dst, src } => {
-                let value = src.read_word(self);
-                dst.write_word(self, value);
+                let value = src.read_word(&self.context);
+                dst.write_word(&mut self.context, value);
             }
             instructions::ExecuteOperation::Alu8 { dst, operation } => {
-                let value = operation.execute(self);
-                dst.write_byte(self, value);
+                let value = operation.execute(&mut self.context);
+                dst.write_byte(&mut self.context, value);
             }
             instructions::ExecuteOperation::Alu16 { dst, operation } => {
-                let value = operation.execute(self);
-                dst.write_word(self, value);
+                let value = operation.execute(&self.context);
+                dst.write_word(&mut self.context, value);
             }
         };
 
         match machine_cycle.memory_operation {
             instructions::MemoryOperation::None => {}
             instructions::MemoryOperation::Read(address_bus_src) => {
-                let address = address_bus_src.read_word(self);
-                self.data_bus = hardware.read_byte(address);
+                let address = address_bus_src.read_word(&mut self.context);
+                self.context.data_bus = hardware.read_byte(address);
             }
             instructions::MemoryOperation::Write(address_bus_src, data_bus_src) => {
-                self.data_bus = data_bus_src.read_byte(self);
-                let address = address_bus_src.read_word(self);
-                hardware.write_byte(address, self.data_bus)
+                self.context.data_bus = data_bus_src.read_byte(&self.context);
+                let address = address_bus_src.read_word(&mut self.context);
+                hardware.write_byte(address, self.context.data_bus)
             }
             instructions::MemoryOperation::CBPrefix => {
                 // TODO: Avoid duplication of code
-                let pc = self.registers.pc;
+                let pc = self.context.registers.pc;
                 let opcode = hardware.read_byte(pc);
-                self.registers.pc = self.registers.pc.wrapping_add(1);
+                self.context.registers.pc = self.context.registers.pc.wrapping_add(1);
 
                 let instruction = instructions::Instruction::decode_cb_prefixed(opcode);
                 match instruction {
@@ -162,7 +169,7 @@ impl Cpu {
                                 condition, ..
                             } => InstructionState {
                                 pc,
-                                condition: condition.check(self),
+                                condition: condition.check(&self.context),
                                 idx_mcycle: 0,
                                 instruction,
                             },
@@ -185,9 +192,9 @@ impl Cpu {
             instructions::MemoryOperation::PrefetchNext => {
                 // TODO: Check for interrupt during the fetch?
                 // TODO: Avoid duplication of code
-                let pc = self.registers.pc;
+                let pc = self.context.registers.pc;
                 let opcode = hardware.read_byte(pc);
-                self.registers.pc = self.registers.pc.wrapping_add(1);
+                self.context.registers.pc = self.context.registers.pc.wrapping_add(1);
 
                 let instruction = instructions::Instruction::decode(opcode);
                 match instruction {
@@ -197,7 +204,7 @@ impl Cpu {
                                 condition, ..
                             } => InstructionState {
                                 pc,
-                                condition: condition.check(self),
+                                condition: condition.check(&self.context),
                                 idx_mcycle: 0,
                                 instruction,
                             },
@@ -219,7 +226,7 @@ impl Cpu {
             }
         }
 
-        println!("\tAfter M-cycle: {:?}", self.registers);
+        println!("\tAfter M-cycle: {:?}", self.context);
 
         if self.instruction_state.idx_mcycle > machine_cycles.len() {
             panic!(

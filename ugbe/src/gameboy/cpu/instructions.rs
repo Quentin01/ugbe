@@ -8,20 +8,24 @@ pub enum AddressBusSource {
 }
 
 impl AddressBusSource {
-    pub fn read_word(&self, cpu: &mut super::Cpu) -> u16 {
+    pub fn read_word(&self, cpu_context: &mut super::CpuContext) -> u16 {
         match self {
             Self::DecrementR16(reg) => {
-                let address = cpu.registers.read_word(*reg);
-                cpu.registers.write_word(*reg, address.wrapping_sub(1));
+                let address = cpu_context.registers.read_word(*reg);
+                cpu_context
+                    .registers
+                    .write_word(*reg, address.wrapping_sub(1));
                 address
             }
             Self::IncrementR16(reg) => {
-                let address = cpu.registers.read_word(*reg);
-                cpu.registers.write_word(*reg, address.wrapping_add(1));
+                let address = cpu_context.registers.read_word(*reg);
+                cpu_context
+                    .registers
+                    .write_word(*reg, address.wrapping_add(1));
                 address
             }
             Self::High(value) => {
-                let value = value.read_byte(cpu);
+                let value = value.read_byte(cpu_context);
                 0xFF00 | value as u16
             }
         }
@@ -75,12 +79,12 @@ pub enum Condition {
 }
 
 impl Condition {
-    pub fn check(&self, cpu: &super::Cpu) -> bool {
+    pub fn check(&self, cpu_context: &super::CpuContext) -> bool {
         match self {
-            Condition::NZ => !cpu.registers.read_flag(super::registers::Flag::Z),
-            Condition::Z => cpu.registers.read_flag(super::registers::Flag::Z),
-            Condition::NC => !cpu.registers.read_flag(super::registers::Flag::C),
-            Condition::C => cpu.registers.read_flag(super::registers::Flag::C),
+            Condition::NZ => !cpu_context.registers.read_flag(super::registers::Flag::Z),
+            Condition::Z => cpu_context.registers.read_flag(super::registers::Flag::Z),
+            Condition::NC => !cpu_context.registers.read_flag(super::registers::Flag::C),
+            Condition::C => cpu_context.registers.read_flag(super::registers::Flag::C),
         }
     }
 }
