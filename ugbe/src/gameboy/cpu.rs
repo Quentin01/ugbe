@@ -100,6 +100,45 @@ impl Cpu {
         }
     }
 
+    fn prefetch_next(&mut self, hardware: &mut Hardware, cb_prefixed: bool) {
+        // TODO: Do interrupt fetch too
+        let pc = self.context.registers.pc;
+        let opcode = hardware.read_byte(pc);
+        self.context.registers.pc = self.context.registers.pc.wrapping_add(1);
+
+        let instruction = match cb_prefixed {
+            true => instructions::Instruction::decode_cb_prefixed(opcode),
+            false => instructions::Instruction::decode(opcode),
+        };
+
+        match instruction {
+            Some(instruction) => {
+                self.instruction_state = match instruction.machine_cycles_operations {
+                    instructions::MachineCycleOperations::Conditional { condition, .. } => {
+                        InstructionState {
+                            pc,
+                            condition: condition.check(&self.context),
+                            idx_mcycle: 0,
+                            instruction,
+                        }
+                    }
+                    instructions::MachineCycleOperations::NotConditional(_) => InstructionState {
+                        pc,
+                        condition: true,
+                        idx_mcycle: 0,
+                        instruction,
+                    },
+                };
+            }
+            None => panic!(
+                "Encountered invalid instruction ({}0x{:02x}) at ${:04x}",
+                if cb_prefixed { "0xCB " } else { "" },
+                opcode,
+                pc
+            ),
+        }
+    }
+
     pub fn tick(&mut self, hardware: &mut Hardware) {
         if self.instruction_state.idx_mcycle == 0 {
             println!(
@@ -156,73 +195,10 @@ impl Cpu {
                 hardware.write_byte(address, self.context.data_bus)
             }
             instructions::MemoryOperation::CBPrefix => {
-                // TODO: Avoid duplication of code
-                let pc = self.context.registers.pc;
-                let opcode = hardware.read_byte(pc);
-                self.context.registers.pc = self.context.registers.pc.wrapping_add(1);
-
-                let instruction = instructions::Instruction::decode_cb_prefixed(opcode);
-                match instruction {
-                    Some(instruction) => {
-                        self.instruction_state = match instruction.machine_cycles_operations {
-                            instructions::MachineCycleOperations::Conditional {
-                                condition, ..
-                            } => InstructionState {
-                                pc,
-                                condition: condition.check(&self.context),
-                                idx_mcycle: 0,
-                                instruction,
-                            },
-                            instructions::MachineCycleOperations::NotConditional(_) => {
-                                InstructionState {
-                                    pc,
-                                    condition: true,
-                                    idx_mcycle: 0,
-                                    instruction,
-                                }
-                            }
-                        };
-                    }
-                    None => panic!(
-                        "Encountered invalid instruction (0xCB 0x{:x}) at ${:04x}",
-                        opcode, pc
-                    ),
-                }
+                self.prefetch_next(hardware, true);
             }
             instructions::MemoryOperation::PrefetchNext => {
-                // TODO: Check for interrupt during the fetch?
-                // TODO: Avoid duplication of code
-                let pc = self.context.registers.pc;
-                let opcode = hardware.read_byte(pc);
-                self.context.registers.pc = self.context.registers.pc.wrapping_add(1);
-
-                let instruction = instructions::Instruction::decode(opcode);
-                match instruction {
-                    Some(instruction) => {
-                        self.instruction_state = match instruction.machine_cycles_operations {
-                            instructions::MachineCycleOperations::Conditional {
-                                condition, ..
-                            } => InstructionState {
-                                pc,
-                                condition: condition.check(&self.context),
-                                idx_mcycle: 0,
-                                instruction,
-                            },
-                            instructions::MachineCycleOperations::NotConditional(_) => {
-                                InstructionState {
-                                    pc,
-                                    condition: true,
-                                    idx_mcycle: 0,
-                                    instruction,
-                                }
-                            }
-                        };
-                    }
-                    None => panic!(
-                        "Encountered invalid instruction (0x{:x}) at ${:04x}",
-                        opcode, pc
-                    ),
-                }
+                self.prefetch_next(hardware, false);
             }
         }
 
