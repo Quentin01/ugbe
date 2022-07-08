@@ -1,7 +1,64 @@
 use super::hardware::Hardware;
 
+mod alu;
 mod instructions;
 mod registers;
+
+#[derive(Debug, Copy, Clone)]
+pub enum In8 {
+    DataBus,
+    R8(registers::R8),
+}
+
+impl In8 {
+    pub fn read_byte(&self, cpu: &Cpu) -> u8 {
+        match self {
+            Self::DataBus => cpu.data_bus,
+            Self::R8(reg) => cpu.registers.read_byte(*reg),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Out8 {
+    None,
+    R8(registers::R8),
+}
+
+impl Out8 {
+    pub fn write_byte(&self, cpu: &mut Cpu, value: u8) {
+        match self {
+            Self::None => {}
+            Self::R8(reg) => cpu.registers.write_byte(*reg, value),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Out16 {
+    R16(registers::R16),
+}
+
+impl Out16 {
+    pub fn write_word(&self, cpu: &mut Cpu, value: u16) {
+        match self {
+            Self::R16(reg) => cpu.registers.write_word(*reg, value),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum In16 {
+    R16(registers::R16),
+}
+
+impl In16 {
+    pub fn read_word(&self, cpu: &Cpu) -> u16 {
+        match self {
+            Self::R16(reg) => cpu.registers.read_word(*reg),
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone)]
 struct InstructionState {
@@ -62,53 +119,72 @@ impl Cpu {
 
         match machine_cycle.execute_operation {
             instructions::ExecuteOperation::None => {}
-            instructions::ExecuteOperation::StoreInR8 { dst, src } => {
-                let value = match src {
-                    instructions::In8::DataBus => self.data_bus,
-                    instructions::In8::R8(reg) => self.registers.read_byte(reg),
-                    instructions::In8::Xor(a, b) => {
-                        // TODO: Set the flags
-                        self.registers.read_byte(a) ^ self.registers.read_byte(b)
-                    }
-                };
-
-                self.registers.write_byte(dst, value);
+            instructions::ExecuteOperation::Store8 { dst, src } => {
+                let value = src.read_byte(self);
+                dst.write_byte(self, value);
+            }
+            instructions::ExecuteOperation::Store16 { dst, src } => {
+                let value = src.read_word(self);
+                dst.write_word(self, value);
+            }
+            instructions::ExecuteOperation::Alu8 { dst, operation } => {
+                let value = operation.execute(self);
+                dst.write_byte(self, value);
+            }
+            instructions::ExecuteOperation::Alu16 { dst, operation } => {
+                let value = operation.execute(self);
+                dst.write_word(self, value);
             }
         };
 
         match machine_cycle.memory_operation {
             instructions::MemoryOperation::None => {}
             instructions::MemoryOperation::Read(address_bus_src) => {
-                // TODO: Avoid duplicate code
-                let address = match address_bus_src {
-                    instructions::AddressBusSource::IncrementR16(reg) => {
-                        let address = self.registers.read_word(reg);
-                        self.registers.write_word(reg, address.wrapping_add(1));
-                        address
-                    }
-                };
-
+                let address = address_bus_src.read_word(self);
                 self.data_bus = hardware.read_byte(address);
             }
             instructions::MemoryOperation::Write(address_bus_src, data_bus_src) => {
-                self.data_bus = match data_bus_src {
-                    instructions::DataBusSource::R8(reg) => self.registers.read_byte(reg),
-                };
-
-                // TODO: Avoid duplicate code
-                let address = match address_bus_src {
-                    instructions::AddressBusSource::IncrementR16(reg) => {
-                        let address = self.registers.read_word(reg);
-                        self.registers.write_word(reg, address.wrapping_add(1));
-                        address
-                    }
-                };
-
+                self.data_bus = data_bus_src.read_byte(self);
+                let address = address_bus_src.read_word(self);
                 hardware.write_byte(address, self.data_bus)
             }
-            instructions::MemoryOperation::CBPrefix => todo!("CB prefix"),
+            instructions::MemoryOperation::CBPrefix => {
+                // TODO: Avoid duplication of code
+                let pc = self.registers.pc;
+                let opcode = hardware.read_byte(pc);
+                self.registers.pc = self.registers.pc.wrapping_add(1);
+
+                let instruction = instructions::Instruction::decode_cb_prefixed(opcode);
+                match instruction {
+                    Some(instruction) => {
+                        self.instruction_state = match instruction.machine_cycles_operations {
+                            instructions::MachineCycleOperations::Conditional {
+                                condition, ..
+                            } => InstructionState {
+                                pc,
+                                condition: condition.check(self),
+                                idx_mcycle: 0,
+                                instruction,
+                            },
+                            instructions::MachineCycleOperations::NotConditional(_) => {
+                                InstructionState {
+                                    pc,
+                                    condition: true,
+                                    idx_mcycle: 0,
+                                    instruction,
+                                }
+                            }
+                        };
+                    }
+                    None => panic!(
+                        "Encountered invalid instruction (0xCB 0x{:x}) at ${:04x}",
+                        opcode, pc
+                    ),
+                }
+            }
             instructions::MemoryOperation::PrefetchNext => {
                 // TODO: Check for interrupt during the fetch?
+                // TODO: Avoid duplication of code
                 let pc = self.registers.pc;
                 let opcode = hardware.read_byte(pc);
                 self.registers.pc = self.registers.pc.wrapping_add(1);
@@ -119,10 +195,15 @@ impl Cpu {
                         self.instruction_state = match instruction.machine_cycles_operations {
                             instructions::MachineCycleOperations::Conditional {
                                 condition, ..
-                            } => todo!(),
+                            } => InstructionState {
+                                pc,
+                                condition: condition.check(self),
+                                idx_mcycle: 0,
+                                instruction,
+                            },
                             instructions::MachineCycleOperations::NotConditional(_) => {
                                 InstructionState {
-                                    pc: pc,
+                                    pc,
                                     condition: true,
                                     idx_mcycle: 0,
                                     instruction,
@@ -131,7 +212,7 @@ impl Cpu {
                         };
                     }
                     None => panic!(
-                        "Encountered invalid instruction (0x{:x}) at 0x{:x}",
+                        "Encountered invalid instruction (0x{:x}) at ${:04x}",
                         opcode, pc
                     ),
                 }

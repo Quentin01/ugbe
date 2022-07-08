@@ -13,6 +13,10 @@ pub struct Registers {
     pub f: u8,
     pub h: u8,
     pub l: u8,
+    /// Extra register used as temporary between M-cycles
+    pub x: u8,
+    /// Extra register used as temporary between M-cycles
+    pub y: u8,
     pub pc: u16,
     pub sp: u16,
 }
@@ -33,9 +37,12 @@ pub enum R8 {
     F,
     H,
     L,
+    X,
+    Y,
     BC(R16ToR8),
     DE(R16ToR8),
     HL(R16ToR8),
+    XY(R16ToR8),
     PC(R16ToR8),
     SP(R16ToR8),
 }
@@ -46,6 +53,7 @@ pub enum R16 {
     BC,
     DE,
     HL,
+    XY,
     SP,
     PC,
 }
@@ -69,6 +77,8 @@ impl Registers {
             R8::F => self.f,
             R8::H => self.h,
             R8::L => self.l,
+            R8::X => self.x,
+            R8::Y => self.y,
             R8::BC(byte) => match byte {
                 R16ToR8::High => self.b,
                 R16ToR8::Low => self.c,
@@ -80,6 +90,10 @@ impl Registers {
             R8::HL(byte) => match byte {
                 R16ToR8::High => self.h,
                 R16ToR8::Low => self.l,
+            },
+            R8::XY(byte) => match byte {
+                R16ToR8::High => self.x,
+                R16ToR8::Low => self.y,
             },
             R8::PC(byte) => match byte {
                 R16ToR8::High => self.pc.to_be_bytes()[0],
@@ -102,6 +116,8 @@ impl Registers {
             R8::F => self.f = value,
             R8::H => self.h = value,
             R8::L => self.l = value,
+            R8::X => self.x = value,
+            R8::Y => self.y = value,
             R8::BC(byte) => match byte {
                 R16ToR8::High => self.b = value,
                 R16ToR8::Low => self.c = value,
@@ -113,6 +129,10 @@ impl Registers {
             R8::HL(byte) => match byte {
                 R16ToR8::High => self.h = value,
                 R16ToR8::Low => self.l = value,
+            },
+            R8::XY(byte) => match byte {
+                R16ToR8::High => self.x = value,
+                R16ToR8::Low => self.y = value,
             },
             R8::PC(byte) => match byte {
                 R16ToR8::High => self.pc = u16::from_be_bytes([value, self.pc.to_be_bytes()[1]]),
@@ -131,6 +151,7 @@ impl Registers {
             R16::BC => u16::from_be_bytes([self.b, self.c]),
             R16::DE => u16::from_be_bytes([self.d, self.e]),
             R16::HL => u16::from_be_bytes([self.h, self.l]),
+            R16::XY => u16::from_be_bytes([self.x, self.y]),
             R16::SP => self.sp,
             R16::PC => self.pc,
         }
@@ -142,6 +163,7 @@ impl Registers {
             R16::BC => [self.b, self.c] = value.to_be_bytes(),
             R16::DE => [self.d, self.e] = value.to_be_bytes(),
             R16::HL => [self.h, self.l] = value.to_be_bytes(),
+            R16::XY => [self.x, self.y] = value.to_be_bytes(),
             R16::SP => self.sp = value,
             R16::PC => self.pc = value,
         }
@@ -177,12 +199,14 @@ impl Registers {
 
 #[cfg(test)]
 mod tests {
-    use super::{Flag, Registers, R8, R16ToR8};
+    use super::{Flag, R16ToR8, Registers, R8};
 
     #[test]
     fn read_pc_low_and_high() {
-        let mut registers = Registers::default();
-        registers.pc = 0xAABB;
+        let registers = Registers {
+            pc: 0xAABB,
+            ..Registers::default()
+        };
 
         assert_eq!(registers.read_byte(R8::PC(R16ToR8::Low)), 0xBB);
         assert_eq!(registers.read_byte(R8::PC(R16ToR8::High)), 0xAA);

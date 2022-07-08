@@ -1,37 +1,61 @@
 use std::{borrow::Cow, fmt::Display};
 
-use super::registers::{self};
-
 #[derive(Debug, Copy, Clone)]
 pub enum AddressBusSource {
+    DecrementR16(super::registers::R16),
     IncrementR16(super::registers::R16),
+    High(super::In8),
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum DataBusSource {
-    R8(super::registers::R8),
+impl AddressBusSource {
+    pub fn read_word(&self, cpu: &mut super::Cpu) -> u16 {
+        match self {
+            Self::DecrementR16(reg) => {
+                let address = cpu.registers.read_word(*reg);
+                cpu.registers.write_word(*reg, address.wrapping_sub(1));
+                address
+            }
+            Self::IncrementR16(reg) => {
+                let address = cpu.registers.read_word(*reg);
+                cpu.registers.write_word(*reg, address.wrapping_add(1));
+                address
+            }
+            Self::High(value) => {
+                let value = value.read_byte(cpu);
+                0xFF00 | value as u16
+            }
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum MemoryOperation {
     None,
     Read(AddressBusSource),
-    Write(AddressBusSource, DataBusSource),
+    Write(AddressBusSource, super::In8),
     CBPrefix,
     PrefetchNext,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum In8 {
-    DataBus,
-    R8(registers::R8),
-    Xor(registers::R8, registers::R8),
-}
-
-#[derive(Debug, Copy, Clone)]
 pub enum ExecuteOperation {
     None,
-    StoreInR8 { dst: registers::R8, src: In8 },
+    Store8 {
+        dst: super::Out8,
+        src: super::In8,
+    },
+    Store16 {
+        dst: super::Out16,
+        src: super::In16,
+    },
+    Alu8 {
+        dst: super::Out8,
+        operation: super::alu::Operation8,
+    },
+    Alu16 {
+        dst: super::Out16,
+        operation: super::alu::Operation16,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -51,12 +75,12 @@ pub enum Condition {
 }
 
 impl Condition {
-    pub fn check(&self, registers: &registers::Registers) -> bool {
+    pub fn check(&self, cpu: &super::Cpu) -> bool {
         match self {
-            Condition::NZ => !registers.read_flag(registers::Flag::Z),
-            Condition::Z => registers.read_flag(registers::Flag::Z),
-            Condition::NC => !registers.read_flag(registers::Flag::C),
-            Condition::C => registers.read_flag(registers::Flag::C),
+            Condition::NZ => !cpu.registers.read_flag(super::registers::Flag::Z),
+            Condition::Z => cpu.registers.read_flag(super::registers::Flag::Z),
+            Condition::NC => !cpu.registers.read_flag(super::registers::Flag::C),
+            Condition::C => cpu.registers.read_flag(super::registers::Flag::C),
         }
     }
 }
@@ -92,18 +116,33 @@ impl Instruction {
     pub fn concrete_desc(&self, pc: u16, hardware: &super::Hardware) -> Cow<'static, str> {
         match self.concrete_desc {
             Some(concrete_desc) => {
-                if concrete_desc.contains("{imm8}") {
+                if concrete_desc.contains("{u8}") {
                     str::replace(
                         concrete_desc,
-                        "{imm8}",
-                        &format!("${:02x}", hardware.read_byte(pc)),
+                        "{u8}",
+                        &format!("${:02x}", hardware.read_byte(pc.wrapping_add(1))),
                     )
                     .into()
-                } else if concrete_desc.contains("{imm16}") {
+                } else if concrete_desc.contains("{u16}") {
                     str::replace(
                         concrete_desc,
-                        "{imm16}",
-                        &format!("${:04x}", hardware.read_word(pc)),
+                        "{u16}",
+                        &format!("${:04x}", hardware.read_word(pc.wrapping_add(1))),
+                    )
+                    .into()
+                } else if concrete_desc.contains("{i8}") {
+                    let offset = hardware.read_byte(pc.wrapping_add(1));
+                    let dst_pc = (pc.wrapping_add(2)) as i32 + ((offset as i8) as i32);
+
+                    str::replace(
+                        concrete_desc,
+                        "{i8}",
+                        // TODO: Display as a signed hexadecimal integer
+                        &format!(
+                            "${:02x} (=> ${:04x})",
+                            hardware.read_byte(pc.wrapping_add(1)),
+                            dst_pc
+                        ),
                     )
                     .into()
                 } else {
@@ -154,12 +193,103 @@ macro_rules! ld_r8_r8_instruction {
             desc: concat!("LD ", stringify!($dst), ", ", stringify!($src),),
             concrete_desc: None,
             machine_cycles_operations: MachineCycleOperations::NotConditional(&[MachineCycle {
-                execute_operation: ExecuteOperation::StoreInR8 {
-                    dst: registers::R8::$dst,
-                    src: In8::R8(registers::R8::$dst),
+                execute_operation: ExecuteOperation::Store8 {
+                    dst: super::Out8::R8(super::registers::R8::$dst),
+                    src: super::In8::R8(super::registers::R8::$src),
                 },
                 memory_operation: MemoryOperation::PrefetchNext,
             }]),
+        })
+    };
+}
+
+/// Generate a LD r8, u8 instruction
+/// M1:
+///     Execute: N/A
+///     Memory: Read(PC++)
+/// M2:
+///     Execute: data bus -> r8
+///     Memory: prefetch next instruction
+macro_rules! ld_r8_u8_instruction {
+    ($dst:ident) => {
+        Some(Instruction {
+            desc: concat!("LD ", stringify!($dst), ", u8",),
+            concrete_desc: Some(concat!("LD ", stringify!($dst), ", {u8}",)),
+            machine_cycles_operations: MachineCycleOperations::NotConditional(&[
+                MachineCycle {
+                    execute_operation: ExecuteOperation::None,
+                    memory_operation: MemoryOperation::Read(AddressBusSource::IncrementR16(
+                        super::registers::R16::PC,
+                    )),
+                },
+                MachineCycle {
+                    execute_operation: ExecuteOperation::Store8 {
+                        dst: super::Out8::R8(super::registers::R8::$dst),
+                        src: super::In8::DataBus,
+                    },
+                    memory_operation: MemoryOperation::PrefetchNext,
+                },
+            ]),
+        })
+    };
+}
+
+/// Generate a LD A, ($FF00+r8) instruction
+/// M1:
+///     Execute: N/A
+///     Memory: ReadHigh(r8)
+/// M2:
+///     Execute: data bus -> r8
+///     Memory: prefetch next instruction
+macro_rules! ldh_src_r8_instruction {
+    ($src:ident) => {
+        Some(Instruction {
+            desc: concat!("LD A, (FF00+", stringify!($src), ")"),
+            concrete_desc: None,
+            machine_cycles_operations: MachineCycleOperations::NotConditional(&[
+                MachineCycle {
+                    execute_operation: ExecuteOperation::None,
+                    memory_operation: MemoryOperation::Read(AddressBusSource::High(
+                        super::In8::R8(super::registers::R8::$src),
+                    )),
+                },
+                MachineCycle {
+                    execute_operation: ExecuteOperation::Store8 {
+                        dst: super::Out8::R8(super::registers::R8::A),
+                        src: super::In8::DataBus,
+                    },
+                    memory_operation: MemoryOperation::PrefetchNext,
+                },
+            ]),
+        })
+    };
+}
+
+/// Generate a LD ($FF00+r8), A instruction
+/// M1:
+///     Execute: N/A
+///     Memory: WriteHigh(r8, A)
+/// M2:
+///     Execute: N/A
+///     Memory: prefetch next instruction
+macro_rules! ldh_dst_r8_instruction {
+    ($dst:ident) => {
+        Some(Instruction {
+            desc: concat!("LD (FF00+", stringify!($dst), "), A"),
+            concrete_desc: None,
+            machine_cycles_operations: MachineCycleOperations::NotConditional(&[
+                MachineCycle {
+                    execute_operation: ExecuteOperation::None,
+                    memory_operation: MemoryOperation::Write(
+                        AddressBusSource::High(super::In8::R8(super::registers::R8::$dst)),
+                        super::In8::R8(super::registers::R8::A),
+                    ),
+                },
+                MachineCycle {
+                    execute_operation: ExecuteOperation::None,
+                    memory_operation: MemoryOperation::PrefetchNext,
+                },
+            ]),
         })
     };
 }
@@ -178,27 +308,31 @@ macro_rules! ld_r16_u16_instruction {
     ($dst:ident) => {
         Some(Instruction {
             desc: concat!("LD ", stringify!($dst), ", u16",),
-            concrete_desc: Some(concat!("LD ", stringify!($dst), ", {imm16}",)),
+            concrete_desc: Some(concat!("LD ", stringify!($dst), ", {u16}",)),
             machine_cycles_operations: MachineCycleOperations::NotConditional(&[
                 MachineCycle {
                     execute_operation: ExecuteOperation::None,
                     memory_operation: MemoryOperation::Read(AddressBusSource::IncrementR16(
-                        registers::R16::PC,
+                        super::registers::R16::PC,
                     )),
                 },
                 MachineCycle {
-                    execute_operation: ExecuteOperation::StoreInR8 {
-                        dst: registers::R8::$dst(registers::R16ToR8::Low),
-                        src: In8::DataBus,
+                    execute_operation: ExecuteOperation::Store8 {
+                        dst: super::Out8::R8(super::registers::R8::$dst(
+                            super::registers::R16ToR8::Low,
+                        )),
+                        src: super::In8::DataBus,
                     },
                     memory_operation: MemoryOperation::Read(AddressBusSource::IncrementR16(
-                        registers::R16::PC,
+                        super::registers::R16::PC,
                     )),
                 },
                 MachineCycle {
-                    execute_operation: ExecuteOperation::StoreInR8 {
-                        dst: registers::R8::$dst(registers::R16ToR8::High),
-                        src: In8::DataBus,
+                    execute_operation: ExecuteOperation::Store8 {
+                        dst: super::Out8::R8(super::registers::R8::$dst(
+                            super::registers::R16ToR8::High,
+                        )),
+                        src: super::In8::DataBus,
                     },
                     memory_operation: MemoryOperation::PrefetchNext,
                 },
@@ -223,8 +357,8 @@ macro_rules! ld_dec_r16_r8 {
                 MachineCycle {
                     execute_operation: ExecuteOperation::None,
                     memory_operation: MemoryOperation::Write(
-                        AddressBusSource::IncrementR16(registers::R16::$dst),
-                        DataBusSource::R8(registers::R8::$src),
+                        AddressBusSource::DecrementR16(super::registers::R16::$dst),
+                        super::In8::R8(super::registers::R8::$src),
                     ),
                 },
                 MachineCycle {
@@ -246,11 +380,142 @@ macro_rules! xor_r8_r8_instruction {
             desc: concat!("XOR ", stringify!($dst), ", ", stringify!($src),),
             concrete_desc: None,
             machine_cycles_operations: MachineCycleOperations::NotConditional(&[MachineCycle {
-                execute_operation: ExecuteOperation::StoreInR8 {
-                    dst: registers::R8::$dst,
-                    src: In8::Xor(registers::R8::$dst, registers::R8::$src),
+                execute_operation: ExecuteOperation::Alu8 {
+                    dst: super::Out8::R8(super::registers::R8::$dst),
+                    operation: super::alu::Operation8::Xor(
+                        super::In8::R8(super::registers::R8::$dst),
+                        super::In8::R8(super::registers::R8::$src),
+                    ),
                 },
                 memory_operation: MemoryOperation::PrefetchNext,
+            }]),
+        })
+    };
+}
+
+/// Generate a JR CC, i8 instruction
+/// Condition:
+///     True:
+///         M1:
+///             Execute: N/A
+///             Memory: Read(PC++)
+///         M2:
+///             Execute: PC + signed data bus -> XY
+///             Memory: N/A
+///         M3:
+///             Execute: XY -> PC
+///             Memory: N/A
+///         M4:
+///             Execute: N/A
+///             Memory: prefetch next instruction
+///     False:
+///         M1:
+///             Execute: N/A
+///             Memory: Read(PC++)
+///         M2:
+///             Execute: PC + signed data bus -> XY
+///             Memory: N/A
+///         M3:
+///             Execute: N/A
+///             Memory: prefetch next instruction
+macro_rules! jr_cc_i8_instruction {
+    ($cond:ident) => {
+        Some(Instruction {
+            desc: concat!("JR ", stringify!($cond), ", i8"),
+            concrete_desc: Some(concat!("JR ", stringify!($cond), ", {i8}")),
+            machine_cycles_operations: MachineCycleOperations::Conditional {
+                condition: Condition::$cond,
+                ok: &[
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::None,
+                        memory_operation: MemoryOperation::Read(AddressBusSource::IncrementR16(
+                            super::registers::R16::PC,
+                        )),
+                    },
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::Alu16 {
+                            dst: super::Out16::R16(super::registers::R16::XY),
+                            operation: super::alu::Operation16::AddWithI8(
+                                super::In16::R16(super::registers::R16::PC),
+                                super::In8::DataBus,
+                            ),
+                        },
+                        memory_operation: MemoryOperation::None,
+                    },
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::Store16 {
+                            dst: super::Out16::R16(super::registers::R16::PC),
+                            src: super::In16::R16(super::registers::R16::XY),
+                        },
+                        memory_operation: MemoryOperation::None,
+                    },
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::None,
+                        memory_operation: MemoryOperation::PrefetchNext,
+                    },
+                ],
+                not_ok: &[
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::None,
+                        memory_operation: MemoryOperation::Read(AddressBusSource::IncrementR16(
+                            super::registers::R16::PC,
+                        )),
+                    },
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::Alu16 {
+                            dst: super::Out16::R16(super::registers::R16::XY),
+                            operation: super::alu::Operation16::AddWithI8(
+                                super::In16::R16(super::registers::R16::PC),
+                                super::In8::DataBus,
+                            ),
+                        },
+                        memory_operation: MemoryOperation::None,
+                    },
+                    MachineCycle {
+                        execute_operation: ExecuteOperation::None,
+                        memory_operation: MemoryOperation::PrefetchNext,
+                    },
+                ],
+            },
+        })
+    };
+}
+
+/// Generate a BIT x, r8 instruction
+/// M1:
+///     Execute: BIT(x, r8)
+///     Memory: prefetch next instruction
+macro_rules! bit_x_r8 {
+    ($dst:ident, $bit:expr) => {
+        Some(Instruction {
+            desc: concat!("BIT ", stringify!($bit), ", ", stringify!($dst),),
+            concrete_desc: None,
+            machine_cycles_operations: MachineCycleOperations::NotConditional(&[MachineCycle {
+                execute_operation: ExecuteOperation::Alu8 {
+                    dst: super::Out8::None,
+                    operation: super::alu::Operation8::Bit(
+                        $bit,
+                        super::In8::R8(super::registers::R8::$dst),
+                    ),
+                },
+                memory_operation: MemoryOperation::PrefetchNext,
+            }]),
+        })
+    };
+}
+
+/// Generate a CB prefix
+/// M1:
+///     Execute: N/A
+///     Memory: Prefetch the CB prefixed instruction
+macro_rules! cb_prefix {
+    () => {
+        Some(Instruction {
+            desc: concat!("XOR ", stringify!($dst), ", ", stringify!($src),),
+            concrete_desc: None,
+            machine_cycles_operations: MachineCycleOperations::NotConditional(&[MachineCycle {
+                execute_operation: ExecuteOperation::None,
+                memory_operation: MemoryOperation::CBPrefix,
             }]),
         })
     };
@@ -263,7 +528,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x03 */ invalid_instruction!(),
     /* 0x04 */ invalid_instruction!(),
     /* 0x05 */ invalid_instruction!(),
-    /* 0x06 */ invalid_instruction!(),
+    /* 0x06 */ ld_r8_u8_instruction!(B),
     /* 0x07 */ invalid_instruction!(),
     /* 0x08 */ invalid_instruction!(),
     /* 0x09 */ invalid_instruction!(),
@@ -271,7 +536,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x0b */ invalid_instruction!(),
     /* 0x0c */ invalid_instruction!(),
     /* 0x0d */ invalid_instruction!(),
-    /* 0x0e */ invalid_instruction!(),
+    /* 0x0e */ ld_r8_u8_instruction!(C),
     /* 0x0f */ invalid_instruction!(),
     /* 0x10 */ invalid_instruction!(),
     /* 0x11 */ ld_r16_u16_instruction!(DE),
@@ -279,7 +544,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x13 */ invalid_instruction!(),
     /* 0x14 */ invalid_instruction!(),
     /* 0x15 */ invalid_instruction!(),
-    /* 0x16 */ invalid_instruction!(),
+    /* 0x16 */ ld_r8_u8_instruction!(D),
     /* 0x17 */ invalid_instruction!(),
     /* 0x18 */ invalid_instruction!(),
     /* 0x19 */ invalid_instruction!(),
@@ -287,15 +552,15 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x1b */ invalid_instruction!(),
     /* 0x1c */ invalid_instruction!(),
     /* 0x1d */ invalid_instruction!(),
-    /* 0x1e */ invalid_instruction!(),
+    /* 0x1e */ ld_r8_u8_instruction!(E),
     /* 0x1f */ invalid_instruction!(),
-    /* 0x20 */ invalid_instruction!(),
+    /* 0x20 */ jr_cc_i8_instruction!(NZ),
     /* 0x21 */ ld_r16_u16_instruction!(HL),
     /* 0x22 */ invalid_instruction!(),
     /* 0x23 */ invalid_instruction!(),
     /* 0x24 */ invalid_instruction!(),
     /* 0x25 */ invalid_instruction!(),
-    /* 0x26 */ invalid_instruction!(),
+    /* 0x26 */ ld_r8_u8_instruction!(H),
     /* 0x27 */ invalid_instruction!(),
     /* 0x28 */ invalid_instruction!(),
     /* 0x29 */ invalid_instruction!(),
@@ -303,7 +568,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x2b */ invalid_instruction!(),
     /* 0x2c */ invalid_instruction!(),
     /* 0x2d */ invalid_instruction!(),
-    /* 0x2e */ invalid_instruction!(),
+    /* 0x2e */ ld_r8_u8_instruction!(L),
     /* 0x2f */ invalid_instruction!(),
     /* 0x30 */ invalid_instruction!(),
     /* 0x31 */ ld_r16_u16_instruction!(SP),
@@ -319,7 +584,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x3b */ invalid_instruction!(),
     /* 0x3c */ invalid_instruction!(),
     /* 0x3d */ invalid_instruction!(),
-    /* 0x3e */ invalid_instruction!(),
+    /* 0x3e */ ld_r8_u8_instruction!(A),
     /* 0x3f */ invalid_instruction!(),
     /* 0x40 */ ld_r8_r8_instruction!(B, B),
     /* 0x41 */ invalid_instruction!(),
@@ -460,7 +725,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0xc8 */ invalid_instruction!(),
     /* 0xc9 */ invalid_instruction!(),
     /* 0xca */ invalid_instruction!(),
-    /* 0xcb */ invalid_instruction!(),
+    /* 0xcb */ cb_prefix!(),
     /* 0xcc */ invalid_instruction!(),
     /* 0xcd */ invalid_instruction!(),
     /* 0xce */ invalid_instruction!(),
@@ -483,7 +748,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0xdf */ invalid_instruction!(),
     /* 0xe0 */ invalid_instruction!(),
     /* 0xe1 */ invalid_instruction!(),
-    /* 0xe2 */ invalid_instruction!(),
+    /* 0xe2 */ ldh_dst_r8_instruction!(C),
     /* 0xe3 */ invalid_instruction!(),
     /* 0xe4 */ invalid_instruction!(),
     /* 0xe5 */ invalid_instruction!(),
@@ -499,7 +764,7 @@ const INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0xef */ invalid_instruction!(),
     /* 0xf0 */ invalid_instruction!(),
     /* 0xf1 */ invalid_instruction!(),
-    /* 0xf2 */ invalid_instruction!(),
+    /* 0xf2 */ ldh_src_r8_instruction!(C),
     /* 0xf3 */ invalid_instruction!(),
     /* 0xf4 */ invalid_instruction!(),
     /* 0xf5 */ invalid_instruction!(),
@@ -641,7 +906,7 @@ const CB_PREFIXED_INSTRUCTIONS_TABLE: [Option<Instruction>; 0x100] = [
     /* 0x79 */ invalid_instruction!(),
     /* 0x7a */ invalid_instruction!(),
     /* 0x7b */ invalid_instruction!(),
-    /* 0x7c */ invalid_instruction!(),
+    /* 0x7c */ bit_x_r8!(H, 7),
     /* 0x7d */ invalid_instruction!(),
     /* 0x7e */ invalid_instruction!(),
     /* 0x7f */ invalid_instruction!(),

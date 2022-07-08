@@ -3,7 +3,7 @@ use std::io;
 use ugbe::gameboy;
 
 fn main() -> Result<(), io::Error> {
-    gameboy::GameboyBuilder::new("/data/ugbe/roms/boot.gb")?
+    gameboy::GameboyBuilder::new("/home/quentin/git/ugbe/roms/boot.gb")?
         .build()
         .run();
     Ok(())
