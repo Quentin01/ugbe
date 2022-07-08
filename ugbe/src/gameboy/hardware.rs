@@ -10,10 +10,13 @@ pub struct Hardware {
 
 impl Hardware {
     pub fn new(boot_rom: BootRom) -> Self {
-        Self {
+        let mut hardware = Self {
             boot_rom,
             tmp_ram: [0; 0x10000],
-        }
+        };
+        // TO REMOVE: Simulate the line for the VBlank to pass the bios
+        hardware.tmp_ram[0xFF44] = 144;
+        hardware
     }
 
     pub fn tick(&mut self) {

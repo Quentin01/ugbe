@@ -39,6 +39,7 @@ pub enum R8 {
     L,
     X,
     Y,
+    AF(R16ToR8),
     BC(R16ToR8),
     DE(R16ToR8),
     HL(R16ToR8),
@@ -79,6 +80,10 @@ impl Registers {
             R8::L => self.l,
             R8::X => self.x,
             R8::Y => self.y,
+            R8::AF(byte) => match byte {
+                R16ToR8::High => self.a,
+                R16ToR8::Low => self.f,
+            },
             R8::BC(byte) => match byte {
                 R16ToR8::High => self.b,
                 R16ToR8::Low => self.c,
@@ -118,6 +123,10 @@ impl Registers {
             R8::L => self.l = value,
             R8::X => self.x = value,
             R8::Y => self.y = value,
+            R8::AF(byte) => match byte {
+                R16ToR8::High => self.a = value,
+                R16ToR8::Low => self.f = value,
+            },
             R8::BC(byte) => match byte {
                 R16ToR8::High => self.b = value,
                 R16ToR8::Low => self.c = value,

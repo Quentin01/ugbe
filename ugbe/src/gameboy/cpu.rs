@@ -91,6 +91,7 @@ impl Cpu {
                 registers: registers::Registers::default(),
                 data_bus: 0,
             },
+            // TODO: Instead of faking an instruction, we should use a state in the CPU to detect that we don't have started yet and to load the first instruction
             instruction_state: InstructionState {
                 pc: 0xFFFF,
                 condition: true,
@@ -115,6 +116,16 @@ impl Cpu {
             Some(instruction) => {
                 self.instruction_state = match instruction.machine_cycles_operations {
                     instructions::MachineCycleOperations::Conditional { condition, .. } => {
+                        // TO REMOVE: To fake the check of the logo in the BIOS
+                        if pc == 0xe9 {
+                            self.context.registers.write_flag(registers::Flag::Z, true);
+                        }
+
+                        // TO REMOVE: To fake the check of the title in the cardbridge
+                        if pc == 0xfa {
+                            self.context.registers.write_flag(registers::Flag::Z, true);
+                        }
+
                         InstructionState {
                             pc,
                             condition: condition.check(&self.context),
@@ -142,11 +153,17 @@ impl Cpu {
     pub fn tick(&mut self, hardware: &mut Hardware) {
         if self.instruction_state.idx_mcycle == 0 {
             println!(
-                "Instruction: {}",
+                "{} ; ${:04x} ; {:?}",
                 self.instruction_state
                     .instruction
-                    .concrete_desc(self.instruction_state.pc, hardware)
+                    .concrete_desc(self.instruction_state.pc, hardware),
+                self.instruction_state.pc,
+                self.context,
             );
+
+            if (0x100..=0xFFFE).contains(&self.instruction_state.pc) {
+                todo!("Executing instructions after the BIOS")
+            }
         }
 
         let machine_cycles = match self.instruction_state.instruction.machine_cycles_operations {
@@ -185,6 +202,9 @@ impl Cpu {
 
         match machine_cycle.memory_operation {
             instructions::MemoryOperation::None => {}
+            instructions::MemoryOperation::ChangeAddress(address_bus_src) => {
+                address_bus_src.read_word(&mut self.context);
+            }
             instructions::MemoryOperation::Read(address_bus_src) => {
                 let address = address_bus_src.read_word(&mut self.context);
                 self.context.data_bus = hardware.read_byte(address);
@@ -201,8 +221,6 @@ impl Cpu {
                 self.prefetch_next(hardware, false);
             }
         }
-
-        println!("\tAfter M-cycle: {:?}", self.context);
 
         if self.instruction_state.idx_mcycle > machine_cycles.len() {
             panic!(
