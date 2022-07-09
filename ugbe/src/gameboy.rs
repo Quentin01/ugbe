@@ -1,7 +1,5 @@
 use std::{fs, io, path::Path};
 
-use self::{cpu::Cpu, hardware::Hardware};
-
 mod cpu;
 mod hardware;
 
@@ -25,8 +23,8 @@ impl GameboyBuilder {
 
     pub fn build(self) -> Gameboy {
         Gameboy {
-            cpu: Cpu::new(),
-            hardware: Hardware::new(self.boot_rom),
+            cpu: cpu::Cpu::new(),
+            hardware: hardware::Hardware::new(self.boot_rom),
         }
     }
 }
@@ -34,14 +32,19 @@ impl GameboyBuilder {
 #[derive(Debug, Clone)]
 pub struct Gameboy {
     cpu: cpu::Cpu,
-    hardware: Hardware,
+    hardware: hardware::Hardware,
 }
 
 impl Gameboy {
     pub fn run(&mut self) {
+        // TODO: Currently the CPU is ticking every m-cycle and the hardware needs it every t-cycle
+        //       In the future, this should be handled by ticking every t-cycle for each
         loop {
             self.cpu.tick(&mut self.hardware);
-            self.hardware.tick();
+
+            for _ in 0..4 {
+                self.hardware.tick();
+            }
         }
     }
 }
