@@ -1,22 +1,27 @@
-mod bootrom;
-mod ppu;
+pub mod bootrom;
+pub mod ppu;
 
-pub use bootrom::BootRom;
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Hardware {
-    boot_rom: BootRom,
+    boot_rom: bootrom::BootRom,
     ppu: ppu::Ppu,
     tmp_ram: [u8; 0x10000],
 }
 
 impl Hardware {
-    pub fn new(boot_rom: BootRom) -> Self {
-        Self {
+    pub fn new(boot_rom: bootrom::BootRom, renderer: Option<Box<dyn ppu::screen::Renderer>>) -> Self {
+        let mut hardware = Self {
             boot_rom,
-            ppu: ppu::Ppu::default(),
+            ppu: ppu::Ppu::new(renderer),
             tmp_ram: [0; 0x10000],
+        };
+        
+        // TO REMOVE: Fake the logo in the cartbridge
+        for addr in 0x104..0x134 {
+            hardware.tmp_ram[addr] = hardware.boot_rom[(addr - 0x104 + 0xA8) as u8];
         }
+
+        hardware
     }
 
     pub fn tick(&mut self) {
@@ -31,9 +36,20 @@ impl Hardware {
             0x8000..=0x9FFF => self.ppu.read_vram_byte(address - 0x8000),
             0xFE00..=0xFE9F => self.ppu.read_oam_byte(address - 0xFE00),
             0xFF40 => self.ppu.read_lcdc(),
+            0xFF41 => self.ppu.read_stat(),
+            0xFF42 => self.ppu.read_scy(),
+            0xFF43 => self.ppu.read_scx(),
+            0xFF44 => self.ppu.read_ly(),
+            0xFF45 => self.ppu.read_lyc(),
+            0xFF46 => todo!("DMA"),
+            0xFF47 => self.ppu.read_bgp(),
+            0xFF48 => self.ppu.read_obp0(),
+            0xFF49 => self.ppu.read_obp1(),
+            0xFF4A => self.ppu.read_wy(),
+            0xFF4B => self.ppu.read_wx(),
             // TODO: Handle memory correctly
             _ => {
-                println!("Warning: Unsupported read at ${:04x}", address);
+                // println!("Warning: Unsupported read at ${:04x}", address);
                 self.tmp_ram[address as usize]
             }
         }
@@ -53,12 +69,23 @@ impl Hardware {
             0x8000..=0x9FFF => self.ppu.write_vram_byte(address - 0x8000, value),
             0xFE00..=0xFE9F => self.ppu.write_oam_byte(address - 0xFE00, value),
             0xFF40 => self.ppu.write_lcdc(value),
+            0xFF41 => self.ppu.write_stat(value),
+            0xFF42 => self.ppu.write_scy(value),
+            0xFF43 => self.ppu.write_scx(value),
+            0xFF44 => {}, // We can't write to LY
+            0xFF45 => self.ppu.write_lyc(value),
+            0xFF46 => todo!("DMA"),
+            0xFF47 => self.ppu.write_bgp(value),
+            0xFF48 => self.ppu.write_obp0(value),
+            0xFF49 => self.ppu.write_obp1(value),
+            0xFF4A => self.ppu.write_wy(value),
+            0xFF4B => self.ppu.write_wx(value),
             // TODO: Handle memory correctly
             _ => {
-                println!(
-                    "Warning: Unsupported write of ${:02x} at ${:04x}",
-                    value, address
-                );
+                // println!(
+                //     "Warning: Unsupported write of ${:02x} at ${:04x}",
+                //     value, address
+                // );
                 self.tmp_ram[address as usize] = value
             }
         }

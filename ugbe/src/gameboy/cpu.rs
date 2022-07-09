@@ -116,11 +116,6 @@ impl Cpu {
             Some(instruction) => {
                 self.instruction_state = match instruction.machine_cycles_operations {
                     instructions::MachineCycleOperations::Conditional { condition, .. } => {
-                        // TO REMOVE: To fake the check of the logo in the BIOS
-                        if pc == 0xe9 {
-                            self.context.registers.write_flag(registers::Flag::Z, true);
-                        }
-
                         // TO REMOVE: To fake the check of the title in the cardbridge
                         if pc == 0xfa {
                             self.context.registers.write_flag(registers::Flag::Z, true);
@@ -152,14 +147,14 @@ impl Cpu {
 
     pub fn tick(&mut self, hardware: &mut Hardware) {
         if self.instruction_state.idx_mcycle == 0 {
-            println!(
-                "{} ; ${:04x} ; {:?}",
-                self.instruction_state
-                    .instruction
-                    .concrete_desc(self.instruction_state.pc, hardware),
-                self.instruction_state.pc,
-                self.context,
-            );
+            // println!(
+            //     "{} ; ${:04x} ; {:?}",
+            //     self.instruction_state
+            //         .instruction
+            //         .concrete_desc(self.instruction_state.pc, hardware),
+            //     self.instruction_state.pc,
+            //     self.context,
+            // );
 
             if (0x100..=0xFFFE).contains(&self.instruction_state.pc) {
                 todo!("Executing instructions after the BIOS")
