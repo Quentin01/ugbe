@@ -2,7 +2,9 @@
 pub enum Operation8 {
     Add(super::In8, super::In8),
     Sub(super::In8, super::In8),
+    And(super::In8, super::In8),
     Xor(super::In8, super::In8),
+    Or(super::In8, super::In8),
     Cp(super::In8, super::In8),
     Bit(usize, super::In8),
     Inc(super::In8),
@@ -56,8 +58,44 @@ impl Operation8 {
 
                 value
             }
+            Self::And(a, b) => {
+                let value = a.read_byte(cpu_context) & b.read_byte(cpu_context);
+
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::Z, value == 0);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::N, false);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::H, true);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::C, false);
+
+                value
+            }
             Self::Xor(a, b) => {
                 let value = a.read_byte(cpu_context) ^ b.read_byte(cpu_context);
+
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::Z, value == 0);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::N, false);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::H, false);
+                cpu_context
+                    .registers
+                    .write_flag(super::registers::Flag::C, false);
+
+                value
+            }
+            Self::Or(a, b) => {
+                let value = a.read_byte(cpu_context) | b.read_byte(cpu_context);
 
                 cpu_context
                     .registers
