@@ -116,11 +116,6 @@ impl Cpu {
             Some(instruction) => {
                 self.instruction_state = match instruction.machine_cycles_operations {
                     instructions::MachineCycleOperations::Conditional { condition, .. } => {
-                        // TO REMOVE: To fake the check of the title in the cardbridge
-                        if pc == 0xfa {
-                            self.context.registers.write_flag(registers::Flag::Z, true);
-                        }
-
                         InstructionState {
                             pc,
                             condition: condition.check(&self.context),
@@ -155,10 +150,6 @@ impl Cpu {
             //     self.instruction_state.pc,
             //     self.context,
             // );
-
-            if (0x100..=0xFFFE).contains(&self.instruction_state.pc) {
-                todo!("Executing instructions after the BIOS")
-            }
         }
 
         let machine_cycles = match self.instruction_state.instruction.machine_cycles_operations {

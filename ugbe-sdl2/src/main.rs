@@ -68,7 +68,7 @@ fn main() -> Result<(), io::Error> {
     canvas.clear();
     canvas.present();
 
-    let mut gameboy = gameboy::GameboyBuilder::new("/home/quentin/git/ugbe/roms/boot.gb")?
+    let mut gameboy = gameboy::GameboyBuilder::new("/home/quentin/git/ugbe/roms/boot.gb", "/home/quentin/git/ugbe/roms/tetris.gb")?
         .add_renderer(Box::new(Renderer::new(renderer_data)))
         .build();
 
