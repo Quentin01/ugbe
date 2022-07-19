@@ -12,7 +12,10 @@ pub struct GameboyBuilder {
 }
 
 impl GameboyBuilder {
-    pub fn new<P: ?Sized + AsRef<Path>>(boot_rom_path: &P, rom_path: &P) -> Result<Self, io::Error> {
+    pub fn new<P: ?Sized + AsRef<Path>>(
+        boot_rom_path: &P,
+        rom_path: &P,
+    ) -> Result<Self, io::Error> {
         let boot_rom_file = fs::File::open(boot_rom_path)?;
         let mut boot_rom_reader = io::BufReader::new(boot_rom_file);
         let mut boot_rom_buffer = Vec::new();
@@ -45,7 +48,6 @@ impl GameboyBuilder {
     }
 }
 
-#[derive(Debug)]
 pub struct Gameboy {
     cpu: cpu::Cpu,
     hardware: hardware::Hardware,
@@ -59,7 +61,7 @@ impl Gameboy {
             if t_cycle % 4 == 0 {
                 self.cpu.tick(&mut self.hardware);
             }
-            
+
             self.hardware.tick();
         }
     }

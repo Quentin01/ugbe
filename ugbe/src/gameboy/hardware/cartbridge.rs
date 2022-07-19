@@ -47,6 +47,7 @@ impl From<Vec<u8>> for Cartbridge {
 
         let mbc = match data[0x147] {
             0x00 => MBC::None,
+            0x01 => MBC::None, // TO REMOVE: MBC1 but fake it to None for blargg tests
             o => todo!("Implement other MBC cartbridge type ${:02x}", o),
         };
 

@@ -6,3 +6,5 @@ authors = ["Quentin BUATHIER <quentinbuathier@gmail.com>"]
 license = "MIT"
 
 [dependencies]
+const_format = "0.2.26"
+paste = "1.0.7"

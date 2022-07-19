@@ -1,0 +1,12 @@
+TODO:
+    - Refactor the ALU operations to have macro taking the Alu in parameter
+    - Expose the screen directly in the gameboy structure? The gameboy can just expose a reference and the PPU keep the ownership
+    - How do we expose vblank, lcd on/off event?
+    - Anyway, I need to change the Renderer trait!!!!!!
+    - Add work ram correctly in the hardware
+    - Add more cartbridge support
+    - Refactor the clocking and the Gameboy.run method to be more precise (+ a warning if the simulation is slower than the real hardware?)
+    - Add a debugger module to add debug features like breakpoints, etc
+    - Handle more instructions of course
+    - Add a README
+    - Add arguments for ugbe-sdl2 + config and cleanup the code
