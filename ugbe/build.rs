@@ -47,60 +47,57 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
         if x == 0 {
             if z == 0 {
                 if y == 0 {
-                    "nop_instruction!()".into()
+                    // TODO nop
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else if y == 1 {
-                    // TODO LD (nn), SP
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    "&implementation::Ld::<operands::DerefImm16ToU16, operands::SP>::new()".into()
                 } else if y == 2 {
                     // TODO STOP
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else if y == 3 {
-                    "jr_instruction!(operands::Off8)".into()
+                    // TODO JR i8
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else if (4..=7).contains(&y) {
-                    format!(
-                        "jr_instruction!({}, operands::Off8)",
-                        TABLE_CC[(y - 4) as usize]
-                    )
-                    .into()
+                    // TODO JR cc[y-4], i8
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else {
                     unreachable!("Y > 7")
                 }
             } else if z == 1 {
                 if q == 0 {
-                    // TODO LD rp[p], nn
                     format!(
-                        "ld16_instruction!({}, operands::Imm16)",
+                        "&implementation::Ld::<{}, operands::Imm16>::new()",
                         TABLE_RP[p as usize]
                     )
                     .into()
                 } else if q == 1 {
                     // TODO ADD HL, rp[p]
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else {
                     unreachable!("Q > 1")
                 }
             } else if z == 2 {
                 if q == 0 {
                     if p == 0 {
-                        "ld8_instruction!(operands::DerefBC, operands::A)".into()
+                        "&implementation::Ld::<operands::DerefBC, operands::A>::new()".into()
                     } else if p == 1 {
-                        "ld8_instruction!(operands::DerefDE, operands::A)".into()
+                        "&implementation::Ld::<operands::DerefDE, operands::A>::new()".into()
                     } else if p == 2 {
-                        "ld8_instruction!(operands::DerefIncHL, operands::A)".into()
+                        "&implementation::Ld::<operands::DerefIncHL, operands::A>::new()".into()
                     } else if p == 3 {
-                        "ld8_instruction!(operands::DerefDecHL, operands::A)".into()
+                        "&implementation::Ld::<operands::DerefDecHL, operands::A>::new()".into()
                     } else {
                         unreachable!("P > 4")
                     }
                 } else if q == 1 {
                     if p == 0 {
-                        "ld8_instruction!(operands::A, operands::DerefBC)".into()
+                        "&implementation::Ld::<operands::A, operands::DerefBC>::new()".into()
                     } else if p == 1 {
-                        "ld8_instruction!(operands::A, operands::DerefDE)".into()
+                        "&implementation::Ld::<operands::A, operands::DerefDE>::new()".into()
                     } else if p == 2 {
-                        "ld8_instruction!(operands::A, operands::DerefIncHL)".into()
+                        "&implementation::Ld::<operands::A, operands::DerefIncHL>::new()".into()
                     } else if p == 3 {
-                        "ld8_instruction!(operands::A, operands::DerefDecHL)".into()
+                        "&implementation::Ld::<operands::A, operands::DerefDecHL>::new()".into()
                     } else {
                         unreachable!("P > 4")
                     }
@@ -108,81 +105,86 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                     unreachable!("Q > 1")
                 }
             } else if z == 6 {
-                format!("ld8_instruction!({}, operands::Imm8)", TABLE_R[y as usize]).into()
+                format!(
+                    "&implementation::Ld::<{}, operands::Imm8>::new()",
+                    TABLE_R[y as usize]
+                )
+                .into()
             } else {
                 // TODO
-                format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
             }
         } else if x == 1 {
             if z == 6 && y == 6 {
                 // TODO
-                format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
             } else {
                 format!(
-                    "ld8_instruction!({}, {})",
+                    "&implementation::Ld::<{}, {}>::new()",
                     TABLE_R[y as usize], TABLE_R[z as usize]
                 )
                 .into()
             }
         } else if x == 2 {
             format!(
-                "alu8_instruction!({}, operands::A, {})",
+                "&implementation::AluTwo::<{}, operands::A, {}>::new()",
                 TABLE_ALU[y as usize], TABLE_R[z as usize]
             )
             .into()
         } else if x == 3 {
             if z == 0 {
                 if y == 4 {
-                    "ld8_instruction!(operands::DerefHighImm8, operands::A)".into()
+                    "&implementation::Ld::<operands::DerefImm8, operands::A>::new()".into()
                 } else if y == 6 {
-                    "ld8_instruction!(operands::A, operands::DerefHighImm8)".into()
+                    "&implementation::Ld::<operands::A, operands::DerefImm8>::new()".into()
                 } else {
                     // TODO
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 }
             } else if z == 2 {
                 if y == 4 {
-                    "ld8_instruction!(operands::DerefHighC, operands::A)".into()
+                    "&implementation::Ld::<operands::DerefC, operands::A>::new()".into()
                 } else if y == 6 {
-                    "ld8_instruction!(operands::A, operands::DerefHighC)".into()
+                    "&implementation::Ld::<operands::A, operands::DerefC>::new()".into()
                 } else {
                     // TODO
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 }
             } else if z == 3 {
                 if y == 1 {
-                    "cb_prefix!()".into()
+                    // "cb_prefix!()".into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else {
                     // TODO
-                    format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 }
             } else {
                 // TODO
-                format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
             }
         } else {
             // TODO
-            format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+            format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
         }
     } else {
         if x == 0 {
             // TODO rot[y], r[z]
-            format!("invalid_instruction!({opcode}, {cb_prefixed})").into()
+            format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
         } else if x == 1 {
             format!(
-                "alu8_instruction!(alu::Bit, {}, operands::Direct<{y}>)",
+                "&implementation::AluBit::<alu::Bit, {y}, {}>::new()",
                 TABLE_R[z as usize]
             )
             .into()
         } else if x == 2 {
             format!(
-                "alu8_instruction!(alu::Res, {}, operands::Direct<{y}>)",
+                "&implementation::AluBit::<alu::Res, {y}, {}>::new()",
                 TABLE_R[z as usize]
             )
             .into()
         } else if x == 3 {
             format!(
-                "alu8_instruction!(alu::Set, {}, operands::Direct<{y}>)",
+                "&implementation::AluBit::<alu::Set, {y}, {}>::new()",
                 TABLE_R[z as usize]
             )
             .into()
@@ -212,11 +214,11 @@ fn main() {
     fs::write(
         &dest_path,
         format!(
-            "pub const INSTRUCTIONS_TABLE: [instructions::Instruction; 0xFF] = [
+            "pub const INSTRUCTIONS_TABLE: [&'static dyn Instruction; 0xFF] = [
 {}
 ];
 
-pub const CB_PREFIXED_INSTRUCTIONS_TABLE: [instructions::Instruction; 0xFF] = [
+pub const CB_PREFIXED_INSTRUCTIONS_TABLE: [&'static dyn Instruction; 0xFF] = [
 {}
 ];",
             decode_instructions(false).join(",\n"),
