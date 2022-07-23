@@ -41,6 +41,33 @@ macro_rules! define_immediate {
 define_immediate!(8);
 define_immediate!(16);
 
+macro_rules! define_offset {
+    ($size:literal) => {
+        paste! {
+            pub struct [<Off $size>] {}
+
+            impl Operand for [<Off $size>] {
+                type Value = [<i $size>];
+
+                fn str() -> Cow<'static, str> {
+                    stringify!([<i $size>]).into()
+                }
+            }
+
+            impl OperandImmediate for [<Off $size>] {}
+
+            impl OperandIn for [<Off $size>]
+            {
+                fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+                    Box::new(ReadImmediate::<Self>::Start(PhantomData))
+                }
+            }
+        }
+    };
+}
+
+define_offset!(8);
+
 macro_rules! define_register_8 {
     ($reg:ident) => {
         paste! {
