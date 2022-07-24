@@ -12,6 +12,7 @@ enum MemoryOperation {
 enum State {
     NotStarted,
     ExecutingInstruction(Box<dyn instructions::InstructionExecution + 'static>),
+    PrefetchingCb,
 }
 
 pub struct Cpu {
@@ -37,7 +38,8 @@ impl Cpu {
         self.registers.set_pc(pc.wrapping_add(1));
 
         if !cb_prefixed && opcode == 0xCB {
-            return self.prefetch_next(hardware, true);
+            self.state = State::PrefetchingCb;
+            return;
         }
 
         let instruction = match cb_prefixed {
@@ -54,14 +56,12 @@ impl Cpu {
     pub fn tick(&mut self, hardware: &mut Hardware) {
         println!("CPU TICK");
 
-        if let State::NotStarted = self.state {
-            self.prefetch_next(hardware, false);
-            return;
-        }
-
         match &mut self.state {
             State::NotStarted => {
-                panic!("Not possible to be not started after a fetch of the next instruction")
+                self.prefetch_next(hardware, false);
+            }
+            State::PrefetchingCb => {
+                self.prefetch_next(hardware, true);
             }
             State::ExecutingInstruction(instruction_execution) => {
                 match instruction_execution.next(&mut self.registers, self.data_bus) {
