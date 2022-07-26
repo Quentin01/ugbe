@@ -1,23 +1,21 @@
-use super::hardware::Hardware;
+use super::bus::{Bus, MemoryOperation};
 
 mod instructions;
 mod registers;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MemoryOperation {
-    None,
-    Read { address: u16 },
-    Write { address: u16, value: u8 },
-}
+use registers::Registers;
+
 enum State {
     NotStarted,
-    ExecutingInstruction(Box<dyn instructions::InstructionExecution + 'static>),
-    PrefetchingCb,
+    WaitingPrefetchRead(bool),
+    ExecutingInstruction(
+        &'static dyn instructions::Instruction,
+        Box<dyn instructions::InstructionExecution + 'static>,
+    ),
 }
 
 pub struct Cpu {
-    registers: registers::Registers,
-    data_bus: u8,
+    registers: Registers,
     state: State,
 }
 
@@ -25,58 +23,42 @@ impl Cpu {
     pub fn new() -> Self {
         Self {
             // TODO: Put the right default value for registers
-            registers: registers::Registers::default(),
-            data_bus: 0,
+            registers: Registers::default(),
             state: State::NotStarted,
         }
     }
 
-    fn prefetch_next(&mut self, hardware: &mut Hardware, cb_prefixed: bool) {
-        // TODO: Do interrupt fetch too
+    fn prefetch_next(&mut self, cb_prefixed: bool) -> MemoryOperation {
+        // TODO: Do interrupt fetch too if cb_prefixed is false
+
         let pc = self.registers.pc();
-        let opcode = hardware.read_byte(pc) as usize;
         self.registers.set_pc(pc.wrapping_add(1));
 
-        if !cb_prefixed && opcode == 0xCB {
-            self.state = State::PrefetchingCb;
-            return;
-        }
-
-        let instruction = match cb_prefixed {
-            true => &instructions::CB_PREFIXED_INSTRUCTIONS_TABLE[opcode],
-            false => &instructions::INSTRUCTIONS_TABLE[opcode],
-        };
-
-        // println!("{:?}", self.registers);
-        // println!("${pc:04x} {}", instruction.desc(pc, hardware));
-
-        self.state = State::ExecutingInstruction(instruction.create_execution());
+        self.state = State::WaitingPrefetchRead(cb_prefixed);
+        MemoryOperation::Read { address: pc }
     }
 
-    pub fn tick(&mut self, hardware: &mut Hardware) {
-        // println!("CPU TICK");
-
+    pub fn tick(&mut self, bus: &Bus) -> MemoryOperation {
         match &mut self.state {
-            State::NotStarted => {
-                self.prefetch_next(hardware, false);
+            State::NotStarted => self.prefetch_next(false),
+            State::WaitingPrefetchRead(cb_prefixed) => {
+                if bus.data() == 0xCB {
+                    return self.prefetch_next(true);
+                }
+
+                let instruction = match cb_prefixed {
+                    true => instructions::CB_PREFIXED_INSTRUCTIONS_TABLE[bus.data() as usize],
+                    false => instructions::INSTRUCTIONS_TABLE[bus.data() as usize],
+                };
+
+                self.state =
+                    State::ExecutingInstruction(instruction, instruction.create_execution());
+                self.tick(bus)
             }
-            State::PrefetchingCb => {
-                self.prefetch_next(hardware, true);
-            }
-            State::ExecutingInstruction(instruction_execution) => {
-                match instruction_execution.next(&mut self.registers, self.data_bus) {
-                    instructions::InstructionExecutionState::Yield(memory_op) => match memory_op {
-                        MemoryOperation::None => {}
-                        MemoryOperation::Read { address } => {
-                            self.data_bus = hardware.read_byte(address)
-                        }
-                        MemoryOperation::Write { address, value } => {
-                            hardware.write_byte(address, value)
-                        }
-                    },
-                    instructions::InstructionExecutionState::Complete => {
-                        self.prefetch_next(hardware, false);
-                    }
+            State::ExecutingInstruction(_instruction, instruction_execution) => {
+                match instruction_execution.next(&mut self.registers, bus.data()) {
+                    instructions::InstructionExecutionState::Yield(memory_op) => memory_op,
+                    instructions::InstructionExecutionState::Complete => self.prefetch_next(false),
                 }
             }
         }

@@ -30,8 +30,10 @@ impl Hardware {
         // TODO: Tick the sub-devices
         self.ppu.tick()
     }
+}
 
-    pub fn read_byte(&self, address: u16) -> u8 {
+impl super::mmu::Mmu for Hardware {
+    fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => self.boot_rom[address as u8],
             0x0..=0x3FFF => self.cartbridge.read_rom_bank0(address - 0x0),
@@ -66,14 +68,7 @@ impl Hardware {
         }
     }
 
-    pub fn read_word(&self, address: u16) -> u16 {
-        u16::from_le_bytes([
-            self.read_byte(address),
-            self.read_byte(address.wrapping_add(1)),
-        ])
-    }
-
-    pub fn write_byte(&mut self, address: u16, value: u8) {
+    fn write_byte(&mut self, address: u16, value: u8) {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => {} // Writing into the boot ROM
             0x0..=0x7FFF => {}                        // Writing into the cartbridge ROM

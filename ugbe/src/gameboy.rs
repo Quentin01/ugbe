@@ -1,7 +1,9 @@
 use std::{fs, io, path::Path};
 
+mod bus;
 mod cpu;
 mod hardware;
+mod mmu;
 
 pub use hardware::ppu::screen;
 
@@ -12,7 +14,10 @@ pub struct GameboyBuilder {
 }
 
 impl GameboyBuilder {
-    pub fn new<P: ?Sized + AsRef<Path>>(boot_rom_path: &P, rom_path: &P) -> Result<Self, io::Error> {
+    pub fn new<P: ?Sized + AsRef<Path>>(
+        boot_rom_path: &P,
+        rom_path: &P,
+    ) -> Result<Self, io::Error> {
         let boot_rom_file = fs::File::open(boot_rom_path)?;
         let mut boot_rom_reader = io::BufReader::new(boot_rom_file);
         let mut boot_rom_buffer = Vec::new();
@@ -41,6 +46,7 @@ impl GameboyBuilder {
         Gameboy {
             cpu: cpu::Cpu::new(),
             hardware: hardware::Hardware::new(self.boot_rom, self.cartbridge, self.renderer),
+            bus: bus::Bus::new(),
         }
     }
 }
@@ -48,6 +54,7 @@ impl GameboyBuilder {
 pub struct Gameboy {
     cpu: cpu::Cpu,
     hardware: hardware::Hardware,
+    bus: bus::Bus,
 }
 
 impl Gameboy {
@@ -56,7 +63,8 @@ impl Gameboy {
         //       In the future, this should be handled by ticking every t-cycle for each
         for t_cycle in 0..cycle_count {
             if t_cycle % 4 == 0 {
-                self.cpu.tick(&mut self.hardware);
+                let memory_operation = self.cpu.tick(&self.bus);
+                self.bus.tick(memory_operation, &mut self.hardware);
             }
 
             self.hardware.tick();
