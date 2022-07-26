@@ -90,6 +90,26 @@ impl AluOneOp<u16> for Dec {
     }
 }
 
+pub struct Rlc {}
+
+impl AluOp for Rlc {
+    const STR: &'static str = "RLC";
+}
+
+impl AluOneOp<u8> for Rlc {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = value.rotate_left(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x80 != 0),
+        }
+    }
+}
+
 pub struct Rl {}
 
 impl AluOp for Rl {
@@ -106,6 +126,126 @@ impl AluOneOp<u8> for Rl {
             nf: Some(false),
             hf: Some(false),
             cf: Some(value & 0x80 != 0),
+        }
+    }
+}
+
+pub struct Rrc {}
+
+impl AluOp for Rrc {
+    const STR: &'static str = "RRC";
+}
+
+impl AluOneOp<u8> for Rrc {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = value.rotate_right(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x1 != 0),
+        }
+    }
+}
+
+pub struct Rr {}
+
+impl AluOp for Rr {
+    const STR: &'static str = "RR";
+}
+
+impl AluOneOp<u8> for Rr {
+    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+        let new_value = (value >> 1) | ((cf as u8) << 7);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x1 != 0),
+        }
+    }
+}
+
+pub struct Sla {}
+
+impl AluOp for Sla {
+    const STR: &'static str = "SLA";
+}
+
+impl AluOneOp<u8> for Sla {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = value << 1;
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x80 != 0),
+        }
+    }
+}
+
+pub struct Sra {}
+
+impl AluOp for Sra {
+    const STR: &'static str = "SRA";
+}
+
+impl AluOneOp<u8> for Sra {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = value >> 1 | (value & 0x80);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x1 != 0),
+        }
+    }
+}
+
+pub struct Swap {}
+
+impl AluOp for Swap {
+    const STR: &'static str = "SWAP";
+}
+
+impl AluOneOp<u8> for Swap {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = (value >> 4) | (value << 4);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(false),
+        }
+    }
+}
+
+pub struct Srl {}
+
+impl AluOp for Srl {
+    const STR: &'static str = "SRL";
+}
+
+impl AluOneOp<u8> for Srl {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+        let new_value = value >> 1;
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x1 == 0),
         }
     }
 }
