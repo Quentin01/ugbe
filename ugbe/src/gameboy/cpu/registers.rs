@@ -17,10 +17,12 @@ pub struct Registers {
 macro_rules! define_r8 {
     ($reg:ident) => {
         paste! {
+            #[allow(dead_code)]
             pub fn [<$reg:lower>](&self) -> u8 {
                 self.[<$reg:lower>]
             }
 
+            #[allow(dead_code)]
             pub fn [<set_ $reg:lower>](&mut self, value: u8) {
                 self.[<$reg:lower>] = value;
             }
@@ -31,10 +33,12 @@ macro_rules! define_r8 {
 macro_rules! define_r16 {
     ($reg:ident) => {
         paste! {
+            #[allow(dead_code)]
             pub fn [<$reg:lower>](&self) -> u16 {
                 self.[<$reg:lower>]
             }
 
+            #[allow(dead_code)]
             pub fn [<set_ $reg:lower>](&mut self, value: u16) {
                 self.[<$reg:lower>] = value;
             }
@@ -45,10 +49,12 @@ macro_rules! define_r16 {
 macro_rules! define_split_r16 {
     ($msb:ident, $lsb:ident) => {
         paste! {
+            #[allow(dead_code)]
             pub fn [<$msb:lower $lsb:lower>](&self) -> u16 {
                 u16::from_be_bytes([self.[<$msb:lower>], self.[<$lsb:lower>]])
             }
 
+            #[allow(dead_code)]
             pub fn [<set_ $msb:lower $lsb:lower>](&mut self, value: u16) {
                 [self.[<$msb:lower>], self.[<$lsb:lower>]] = value.to_be_bytes()
             }
@@ -59,10 +65,12 @@ macro_rules! define_split_r16 {
 macro_rules! define_flag {
     ($flag:ident, $pos:literal) => {
         paste! {
+            #[allow(dead_code)]
             pub fn [<$flag:lower f>](&self) -> bool {
                 ((self.f >> $pos) & 1) != 0
             }
 
+            #[allow(dead_code)]
             pub fn [<set_ $flag:lower f>](&mut self, value: bool) {
                 if value {
                     self.f |= 1 << $pos;

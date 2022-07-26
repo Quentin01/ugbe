@@ -18,11 +18,7 @@ pub trait AluTwoOp<DstValue, SrcValue>: AluOp {
     fn execute(a: DstValue, b: SrcValue, cf: bool) -> AluOpResult<DstValue>;
 }
 
-pub trait AluAOp: AluOp {
-    fn execute(a: u8, cf: bool) -> AluOpResult<u8>;
-}
-
-pub trait AluBitOp<const BitPos: u8>: AluOp {
+pub trait AluBitOp<const BIT_POS: u8>: AluOp {
     fn execute(value: u8) -> AluOpResult<u8>;
 }
 
@@ -33,7 +29,7 @@ impl AluOp for Inc {
 }
 
 impl AluOneOp<u8> for Inc {
-    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
         let new_value = value.wrapping_add(1);
 
         AluOpResult {
@@ -46,6 +42,20 @@ impl AluOneOp<u8> for Inc {
     }
 }
 
+impl AluOneOp<u16> for Inc {
+    fn execute(value: u16, _: bool) -> AluOpResult<u16> {
+        let new_value = value.wrapping_add(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: None,
+            nf: None,
+            hf: None,
+            cf: None,
+        }
+    }
+}
+
 pub struct Dec {}
 
 impl AluOp for Dec {
@@ -53,7 +63,7 @@ impl AluOp for Dec {
 }
 
 impl AluOneOp<u8> for Dec {
-    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
         let new_value = value.wrapping_sub(1);
 
         AluOpResult {
@@ -62,6 +72,55 @@ impl AluOneOp<u8> for Dec {
             nf: Some(false),
             hf: Some(value & 0xF == 0x0),
             cf: None,
+        }
+    }
+}
+
+impl AluOneOp<u16> for Dec {
+    fn execute(value: u16, _: bool) -> AluOpResult<u16> {
+        let new_value = value.wrapping_sub(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: None,
+            nf: None,
+            hf: None,
+            cf: None,
+        }
+    }
+}
+
+pub struct Rl {}
+
+impl AluOp for Rl {
+    const STR: &'static str = "RL";
+}
+
+impl AluOneOp<u8> for Rl {
+    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+        let new_value = (value << 1) | (cf as u8);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(value & 0x80 != 0),
+        }
+    }
+}
+
+pub struct RlA {}
+
+impl AluOp for RlA {
+    const STR: &'static str = "RLA";
+}
+
+impl AluOneOp<u8> for RlA {
+    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            zf: Some(false),
+            ..Rl::execute(value, cf)
         }
     }
 }
@@ -227,11 +286,11 @@ impl AluOp for Bit {
     const STR: &'static str = "BIT";
 }
 
-impl<const BitPos: u8> AluBitOp<BitPos> for Bit {
+impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Bit {
     fn execute(value: u8) -> AluOpResult<u8> {
         AluOpResult {
             value: None,
-            zf: Some(((value >> BitPos) & 1) == 0),
+            zf: Some(((value >> BIT_POS) & 1) == 0),
             nf: Some(false),
             hf: Some(true),
             cf: None,
@@ -245,10 +304,10 @@ impl AluOp for Set {
     const STR: &'static str = "SET";
 }
 
-impl<const BitPos: u8> AluBitOp<BitPos> for Set {
+impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Set {
     fn execute(value: u8) -> AluOpResult<u8> {
         AluOpResult {
-            value: Some(value | (1 << BitPos)),
+            value: Some(value | (1 << BIT_POS)),
             zf: None,
             nf: None,
             hf: None,
@@ -263,10 +322,10 @@ impl AluOp for Res {
     const STR: &'static str = "RES";
 }
 
-impl<const BitPos: u8> AluBitOp<BitPos> for Res {
+impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Res {
     fn execute(value: u8) -> AluOpResult<u8> {
         AluOpResult {
-            value: Some(value & (!(1 << BitPos))),
+            value: Some(value & (!(1 << BIT_POS))),
             zf: None,
             nf: None,
             hf: None,

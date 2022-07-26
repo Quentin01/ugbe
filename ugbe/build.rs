@@ -112,8 +112,21 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                     unreachable!("Q > 1")
                 }
             } else if z == 3 {
-                // TODO INC/DEC r16
-                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                if q == 0 {
+                    format!(
+                        "&implementation::AluOne::<alu::Inc, {}>::new()",
+                        TABLE_RP[p as usize]
+                    )
+                    .into()
+                } else if q == 1 {
+                    format!(
+                        "&implementation::AluOne::<alu::Dec, {}>::new()",
+                        TABLE_RP[p as usize]
+                    )
+                    .into()
+                } else {
+                    unreachable!("Q > 1")
+                }
             } else if z == 4 {
                 format!(
                     "&implementation::AluOne::<alu::Inc, {}>::new()",
@@ -133,8 +146,12 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                 )
                 .into()
             } else if z == 7 {
-                // TODO Assorted operations on A
-                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                if y == 2 {
+                    "&implementation::AluOne::<alu::RlA, operands::A>::new()".into()
+                } else {
+                    // TODO Assorted operations on A
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                }
             } else {
                 unreachable!("Z > 7")
             }
@@ -157,7 +174,9 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
             .into()
         } else if x == 3 {
             if z == 0 {
-                if y == 4 {
+                if (0..=3).contains(&y) {
+                    format!("&implementation::Ret::<{}>::new()", TABLE_CC[y as usize]).into()
+                } else if y == 4 {
                     "&implementation::Ld::<operands::DerefImm8, operands::A>::new()".into()
                 } else if y == 6 {
                     "&implementation::Ld::<operands::A, operands::DerefImm8>::new()".into()
@@ -165,14 +184,33 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                     // TODO
                     format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 }
+            } else if z == 1 {
+                if q == 0 {
+                    format!("&implementation::Pop::<{}>::new()", TABLE_RP2[p as usize]).into()
+                } else if q == 1 {
+                    if p == 0 {
+                        "&implementation::Ret::<condition::None>::new()".into()
+                    } else {
+                        // TODO various ops
+                        format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    }
+                } else {
+                    unreachable!("Q > 1")
+                }
             } else if z == 2 {
-                if y == 4 {
+                if (0..=3).contains(&y) {
+                    // TODO JP cc[y], nn
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                } else if y == 4 {
                     "&implementation::Ld::<operands::DerefC, operands::A>::new()".into()
+                } else if y == 5 {
+                    "&implementation::Ld::<operands::DerefImm16, operands::A>::new()".into()
                 } else if y == 6 {
                     "&implementation::Ld::<operands::A, operands::DerefC>::new()".into()
+                } else if y == 7 {
+                    "&implementation::Ld::<operands::A, operands::DerefImm16>::new()".into()
                 } else {
-                    // TODO
-                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    unreachable!("Y > 7")
                 }
             } else if z == 3 {
                 if y == 1 {
@@ -183,7 +221,7 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                     format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 }
             } else if z == 4 {
-                if (0..3).contains(&y) {
+                if (0..=3).contains(&y) {
                     format!(
                         "&implementation::Call::<{}, operands::Imm16>::new()",
                         TABLE_CC[y as usize]
@@ -194,18 +232,23 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                 }
             } else if z == 5 {
                 if q == 0 {
-                    // TODO push rp2[p]
-                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    format!("&implementation::Push::<{}>::new()", TABLE_RP2[p as usize]).into()
                 } else if q == 1 {
                     if p == 0 {
                         "&implementation::Call::<condition::None, operands::Imm16>::new()".into()
                     } else {
-                        // TODO
+                        // Invalid opcodes
                         format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                     }
                 } else {
                     unreachable!("Q > 1")
                 }
+            } else if z == 6 {
+                format!(
+                    "&implementation::AluTwo::<{}, operands::A, operands::Imm8>::new()",
+                    TABLE_ALU[y as usize]
+                )
+                .into()
             } else {
                 // TODO
                 format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
@@ -217,7 +260,15 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
     } else {
         if x == 0 {
             // TODO rot[y], r[z]
-            format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+            if y == 2 {
+                format!(
+                    "&implementation::AluOne::<alu::Rl, {}>::new()",
+                    TABLE_R[z as usize]
+                )
+                .into()
+            } else {
+                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+            }
         } else if x == 1 {
             format!(
                 "&implementation::AluBit::<alu::Bit, {y}, {}>::new()",

@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
-use crate::gameboy::cpu::instructions::alu::Adc;
-
 use super::super::super::registers::Registers;
 use super::super::super::MemoryOperation;
 use super::{

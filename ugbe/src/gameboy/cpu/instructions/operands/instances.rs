@@ -13,6 +13,7 @@ use super::{
 macro_rules! define_immediate {
     ($size:literal) => {
         paste! {
+            #[allow(dead_code)]
             pub struct [<Imm $size>] {}
 
             impl Operand for [<Imm $size>] {
@@ -32,7 +33,10 @@ macro_rules! define_immediate {
                 }
             }
 
+            #[allow(dead_code)]
             pub type [<DerefImm $size>] = DerefOperand<[<Imm $size>]>;
+
+            #[allow(dead_code)]
             pub type [<DerefImm $size ToU16>] = DerefOperandToU16<[<Imm $size>]>;
         }
     };
@@ -44,6 +48,7 @@ define_immediate!(16);
 macro_rules! define_offset {
     ($size:literal) => {
         paste! {
+            #[allow(dead_code)]
             pub struct [<Off $size>] {}
 
             impl Operand for [<Off $size>] {
@@ -71,6 +76,7 @@ define_offset!(8);
 macro_rules! define_register_8 {
     ($reg:ident) => {
         paste! {
+            #[allow(dead_code)]
             pub struct [<$reg:upper>] {}
 
             impl Operand for [<$reg:upper>] {
@@ -105,6 +111,7 @@ macro_rules! define_register_8 {
                 }
             }
 
+            #[allow(dead_code)]
             pub type [<Deref $reg:upper>] = DerefOperand<[<$reg:upper>]>;
         }
     };
@@ -155,8 +162,13 @@ macro_rules! define_register_16 {
                 }
             }
 
+            #[allow(dead_code)]
             pub type [<Deref $reg:upper>] = DerefOperand<[<$reg:upper>]>;
+
+            #[allow(dead_code)]
             pub type [<DerefInc $reg:upper>] = DerefIncOperand<[<$reg:upper>]>;
+
+            #[allow(dead_code)]
             pub type [<DerefDec $reg:upper>] = DerefDecOperand<[<$reg:upper>]>;
         }
     };

@@ -4,7 +4,7 @@ mod instructions;
 mod registers;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum MemoryOperation {
+pub enum MemoryOperation {
     None,
     Read { address: u16 },
     Write { address: u16, value: u8 },

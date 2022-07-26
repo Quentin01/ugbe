@@ -1,11 +1,10 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use crate::gameboy::cpu::instructions::alu;
-use crate::gameboy::cpu::{registers, MemoryOperation};
+use crate::gameboy::cpu::MemoryOperation;
 
 use super::super::super::registers::Registers;
-use super::super::alu::{AluAOp, AluBitOp, AluOneOp, AluOpResult, AluTwoOp};
+use super::super::alu::{AluBitOp, AluOneOp, AluOpResult, AluTwoOp};
 use super::super::operands::{
     Operand, OperandIn, OperandOut, OperandReadExecution, OperandReadExecutionState,
     OperandWriteExecution, OperandWriteExecutionState,
@@ -86,7 +85,7 @@ where
         Box::new(AluExecution::<Dst, Src, _, false>::Start(
             |dst: Option<Dst::Value>, src: Src::Value, registers: &mut Registers| {
                 AluOp::execute(
-                    dst.expect("As DstIsSrc is false, dst should be set"),
+                    dst.expect("As DST_IS_SRC is false, dst should be set"),
                     src,
                     registers.cf(),
                 )
@@ -95,17 +94,17 @@ where
     }
 }
 
-pub struct AluBit<AluOp, const BitPos: u8, Op>
+pub struct AluBit<AluOp, const BIT_POS: u8, Op>
 where
-    AluOp: AluBitOp<BitPos> + 'static,
+    AluOp: AluBitOp<BIT_POS> + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
 {
     phantom: PhantomData<(AluOp, Op)>,
 }
 
-impl<AluOp, const BitPos: u8, Op> AluBit<AluOp, BitPos, Op>
+impl<AluOp, const BIT_POS: u8, Op> AluBit<AluOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BitPos> + 'static,
+    AluOp: AluBitOp<BIT_POS> + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
 {
     pub const fn new() -> Self {
@@ -115,13 +114,13 @@ where
     }
 }
 
-impl<AluOp, const BitPos: u8, Op> Instruction for AluBit<AluOp, BitPos, Op>
+impl<AluOp, const BIT_POS: u8, Op> Instruction for AluBit<AluOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BitPos> + 'static,
+    AluOp: AluBitOp<BIT_POS> + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        format!("{} {}, {}", AluOp::STR, BitPos, Op::str()).into()
+        format!("{} {}, {}", AluOp::STR, BIT_POS, Op::str()).into()
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
@@ -131,7 +130,7 @@ where
     }
 }
 
-enum AluExecution<Dst, Src, AluFn, const DstIsSrc: bool>
+enum AluExecution<Dst, Src, AluFn, const DST_IS_SRC: bool>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand + OperandIn + OperandOut + 'static,
@@ -157,8 +156,8 @@ where
     Complete,
 }
 
-impl<Dst, Src, AluFn, const DstIsSrc: bool> InstructionExecution
-    for AluExecution<Dst, Src, AluFn, DstIsSrc>
+impl<Dst, Src, AluFn, const DST_IS_SRC: bool> InstructionExecution
+    for AluExecution<Dst, Src, AluFn, DST_IS_SRC>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand + OperandIn + OperandOut + 'static,
@@ -201,7 +200,7 @@ where
                     InstructionExecutionState::Yield(memory_operation)
                 }
                 OperandReadExecutionState::Complete(value) => {
-                    if DstIsSrc {
+                    if DST_IS_SRC {
                         let _ = std::mem::replace(
                             self,
                             Self::Do {
