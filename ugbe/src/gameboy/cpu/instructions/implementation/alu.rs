@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use crate::gameboy::cpu::instructions::alu;
-use crate::gameboy::cpu::MemoryOperation;
+use crate::gameboy::cpu::{registers, MemoryOperation};
 
 use super::super::super::registers::Registers;
 use super::super::alu::{AluAOp, AluBitOp, AluOneOp, AluOpResult, AluTwoOp};
@@ -11,6 +11,44 @@ use super::super::operands::{
     OperandWriteExecution, OperandWriteExecutionState,
 };
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
+
+pub struct AluOne<AluOp, Op>
+where
+    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
+    Op: Operand + OperandIn + OperandOut + 'static,
+{
+    phantom: PhantomData<(AluOp, Op)>,
+}
+
+impl<AluOp, Op> AluOne<AluOp, Op>
+where
+    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
+    Op: Operand + OperandIn + OperandOut + 'static,
+{
+    pub const fn new() -> Self {
+        Self {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<AluOp, Op> Instruction for AluOne<AluOp, Op>
+where
+    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
+    Op: Operand + OperandIn + OperandOut + 'static,
+{
+    fn raw_desc(&self) -> Cow<'static, str> {
+        format!("{} {}", AluOp::STR, Op::str()).into()
+    }
+
+    fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
+        Box::new(AluExecution::<Op, Op, _, true>::Start(
+            |_: Option<Op::Value>, value: Op::Value, registers: &mut Registers| {
+                AluOp::execute(value, registers.cf())
+            },
+        ))
+    }
+}
 
 pub struct AluTwo<AluOp, Dst, Src>
 where

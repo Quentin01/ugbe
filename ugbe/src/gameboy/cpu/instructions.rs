@@ -1,6 +1,7 @@
 use std::{borrow::Cow, fmt::Debug};
 
 mod alu;
+mod condition;
 mod operands;
 
 use super::registers::Registers;

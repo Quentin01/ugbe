@@ -26,6 +26,46 @@ pub trait AluBitOp<const BitPos: u8>: AluOp {
     fn execute(value: u8) -> AluOpResult<u8>;
 }
 
+pub struct Inc {}
+
+impl AluOp for Inc {
+    const STR: &'static str = "INC";
+}
+
+impl AluOneOp<u8> for Inc {
+    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+        let new_value = value.wrapping_add(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(value & 0xF == 0xF),
+            cf: None,
+        }
+    }
+}
+
+pub struct Dec {}
+
+impl AluOp for Dec {
+    const STR: &'static str = "DEC";
+}
+
+impl AluOneOp<u8> for Dec {
+    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+        let new_value = value.wrapping_sub(1);
+
+        AluOpResult {
+            value: Some(new_value),
+            zf: Some(new_value == 0),
+            nf: Some(false),
+            hf: Some(value & 0xF == 0x0),
+            cf: None,
+        }
+    }
+}
+
 pub struct Add {}
 
 impl AluOp for Add {

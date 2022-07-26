@@ -66,7 +66,7 @@ impl Cpu {
             State::ExecutingInstruction(instruction_execution) => {
                 match instruction_execution.next(&mut self.registers, self.data_bus) {
                     instructions::InstructionExecutionState::Yield(memory_op) => match memory_op {
-                        MemoryOperation::None => todo!(),
+                        MemoryOperation::None => {}
                         MemoryOperation::Read { address } => {
                             self.data_bus = hardware.read_byte(address)
                         }

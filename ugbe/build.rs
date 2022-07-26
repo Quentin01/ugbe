@@ -28,7 +28,12 @@ const TABLE_RP2: [&str; 4] = [
     "operands::AF",
 ];
 
-const TABLE_CC: [&str; 4] = ["NZ", "Z", "NC", "C"];
+const TABLE_CC: [&str; 4] = [
+    "condition::NZ",
+    "condition::Z",
+    "condition::NC",
+    "condition::C",
+];
 
 const TABLE_ALU: [&str; 8] = [
     "alu::Add", "alu::Adc", "alu::Sub", "alu::Sbc", "alu::And", "alu::Xor", "alu::Or", "alu::Cp",
@@ -55,11 +60,13 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                     // TODO STOP
                     format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else if y == 3 {
-                    // TODO JR i8
-                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    "&implementation::Jr::<condition::None, operands::Off8>::new()".into()
                 } else if (4..=7).contains(&y) {
-                    // TODO JR cc[y-4], i8
-                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    format!(
+                        "&implementation::Jr::<{}, operands::Off8>::new()",
+                        TABLE_CC[(y - 4) as usize]
+                    )
+                    .into()
                 } else {
                     unreachable!("Y > 7")
                 }
@@ -104,15 +111,32 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                 } else {
                     unreachable!("Q > 1")
                 }
+            } else if z == 3 {
+                // TODO INC/DEC r16
+                format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+            } else if z == 4 {
+                format!(
+                    "&implementation::AluOne::<alu::Inc, {}>::new()",
+                    TABLE_R[y as usize]
+                )
+                .into()
+            } else if z == 5 {
+                format!(
+                    "&implementation::AluOne::<alu::Dec, {}>::new()",
+                    TABLE_R[y as usize]
+                )
+                .into()
             } else if z == 6 {
                 format!(
                     "&implementation::Ld::<{}, operands::Imm8>::new()",
                     TABLE_R[y as usize]
                 )
                 .into()
-            } else {
-                // TODO
+            } else if z == 7 {
+                // TODO Assorted operations on A
                 format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+            } else {
+                unreachable!("Z > 7")
             }
         } else if x == 1 {
             if z == 6 && y == 6 {
@@ -152,11 +176,35 @@ fn decode_instruction(cb_prefixed: bool, opcode: u8) -> Cow<'static, str> {
                 }
             } else if z == 3 {
                 if y == 1 {
-                    // "cb_prefix!()".into()
+                    // CB prefix already handled by the CPU
                     format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
                 } else {
                     // TODO
                     format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                }
+            } else if z == 4 {
+                if (0..3).contains(&y) {
+                    format!(
+                        "&implementation::Call::<{}, operands::Imm16>::new()",
+                        TABLE_CC[y as usize]
+                    )
+                    .into()
+                } else {
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                }
+            } else if z == 5 {
+                if q == 0 {
+                    // TODO push rp2[p]
+                    format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                } else if q == 1 {
+                    if p == 0 {
+                        "&implementation::Call::<condition::None, operands::Imm16>::new()".into()
+                    } else {
+                        // TODO
+                        format!("&implementation::Invalid::<{opcode}, {cb_prefixed}>::new()").into()
+                    }
+                } else {
+                    unreachable!("Q > 1")
                 }
             } else {
                 // TODO
