@@ -45,7 +45,7 @@ impl Hardware {
             0xFF43 => self.ppu.read_scx(),
             0xFF44 => self.ppu.read_ly(),
             0xFF45 => self.ppu.read_lyc(),
-            0xFF46 => todo!("DMA"),
+            0xFF46 => todo!("DMA read"),
             0xFF47 => self.ppu.read_bgp(),
             0xFF48 => self.ppu.read_obp0(),
             0xFF49 => self.ppu.read_obp1(),
@@ -57,7 +57,7 @@ impl Hardware {
                 } else {
                     0xFE
                 }
-            },
+            }
             // TODO: Handle memory correctly
             _ => {
                 // println!("Warning: Unsupported read at ${:04x}", address);
@@ -75,8 +75,8 @@ impl Hardware {
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
         match address {
-            0x0..=0xFF if self.boot_rom_enabled => {}, // Writing into the boot ROM
-            0x0..=0x7FFF => {}, // Writing into the cartbridge ROM
+            0x0..=0xFF if self.boot_rom_enabled => {} // Writing into the boot ROM
+            0x0..=0x7FFF => {}                        // Writing into the cartbridge ROM
             0x8000..=0x9FFF => self.ppu.write_vram_byte(address - 0x8000, value),
             0xA000..=0xBFFF => self.cartbridge.write_ram(address - 0xA000, value),
             0xFE00..=0xFE9F => self.ppu.write_oam_byte(address - 0xFE00, value),
@@ -86,7 +86,7 @@ impl Hardware {
             0xFF43 => self.ppu.write_scx(value),
             0xFF44 => {} // We can't write to LY
             0xFF45 => self.ppu.write_lyc(value),
-            0xFF46 => todo!("DMA"),
+            0xFF46 => todo!("DMA write"),
             0xFF47 => self.ppu.write_bgp(value),
             0xFF48 => self.ppu.write_obp0(value),
             0xFF49 => self.ppu.write_obp1(value),
