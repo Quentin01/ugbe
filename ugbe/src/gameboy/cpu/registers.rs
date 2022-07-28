@@ -51,12 +51,14 @@ macro_rules! define_split_r16 {
         paste! {
             #[allow(dead_code)]
             pub fn [<$msb:lower $lsb:lower>](&self) -> u16 {
-                u16::from_be_bytes([self.[<$msb:lower>], self.[<$lsb:lower>]])
+                u16::from_be_bytes([self.[<$msb:lower>](), self.[<$lsb:lower>]()])
             }
 
             #[allow(dead_code)]
             pub fn [<set_ $msb:lower $lsb:lower>](&mut self, value: u16) {
-                [self.[<$msb:lower>], self.[<$lsb:lower>]] = value.to_be_bytes()
+                let [msb, lsb] = value.to_be_bytes();
+                self.[<set_ $msb:lower>](msb);
+                self.[<set_ $lsb:lower>](lsb);
             }
         }
     };
@@ -88,9 +90,19 @@ impl Registers {
     define_r8!(C);
     define_r8!(D);
     define_r8!(E);
-    define_r8!(F);
     define_r8!(H);
     define_r8!(L);
+
+    #[allow(dead_code)]
+    pub fn f(&self) -> u8 {
+        self.f
+    }
+
+    #[allow(dead_code)]
+    pub fn set_f(&mut self, value: u8) {
+        // The last four bits of F can't be set
+        self.f = value & 0xF0;
+    }
 
     define_r16!(SP);
     define_r16!(PC);
