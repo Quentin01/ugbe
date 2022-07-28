@@ -62,8 +62,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
     if x == 0 {
         if z == 0 {
             if y == 0 {
-                // TODO: NOP
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::Nop::new()".into()
             } else if y == 1 {
                 "&implementation::Ld::<operands::DerefImm16ToU16, operands::SP>::new()".into()
             } else if y == 2 {
