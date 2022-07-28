@@ -172,11 +172,9 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             } else if y == 5 {
                 "&implementation::AluOne::<alu::Cpl, operands::A>::new()".into()
             } else if y == 6 {
-                // TODO: SCF
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::Scf, operands::A>::new()".into()
             } else if y == 7 {
-                // TODO: CCF
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::Ccf, operands::A>::new()".into()
             } else {
                 unreachable!("Y > 7")
             }

@@ -364,6 +364,42 @@ impl AluOneOp<u8> for Cpl {
     }
 }
 
+pub struct Scf {}
+
+impl AluOp for Scf {
+    const STR: &'static str = "SCF";
+}
+
+impl AluOneOp<u8> for Scf {
+    fn execute(_: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            value: None,
+            zf: None,
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(true),
+        }
+    }
+}
+
+pub struct Ccf {}
+
+impl AluOp for Ccf {
+    const STR: &'static str = "CCF";
+}
+
+impl AluOneOp<u8> for Ccf {
+    fn execute(_: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            value: None,
+            zf: None,
+            nf: Some(false),
+            hf: Some(false),
+            cf: Some(!cf),
+        }
+    }
+}
+
 pub struct Add {}
 
 impl AluOp for Add {
