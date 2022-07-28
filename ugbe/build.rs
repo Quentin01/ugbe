@@ -347,10 +347,10 @@ fn decode_cb_instruction(opcode: u8) -> Cow<'static, str> {
     }
 }
 
-fn decode_instructions(cb_prefixed: bool) -> [String; 0xFF] {
-    let mut instructions = Vec::with_capacity(0xFF);
+fn decode_instructions(cb_prefixed: bool) -> [String; 256] {
+    let mut instructions = Vec::with_capacity(256);
 
-    for opcode in 0..0xFF {
+    for opcode in 0..256 {
         instructions.push(format!(
             "\t/* 0x{opcode:02x} */ {}",
             if cb_prefixed {
@@ -371,11 +371,11 @@ fn main() {
     fs::write(
         &dest_path,
         format!(
-            "pub const INSTRUCTIONS_TABLE: [&'static dyn Instruction; 0xFF] = [
+            "pub const INSTRUCTIONS_TABLE: [&'static dyn Instruction; 256] = [
 {}
 ];
 
-pub const CB_PREFIXED_INSTRUCTIONS_TABLE: [&'static dyn Instruction; 0xFF] = [
+pub const CB_PREFIXED_INSTRUCTIONS_TABLE: [&'static dyn Instruction; 256] = [
 {}
 ];",
             decode_instructions(false).join(",\n"),
