@@ -11,7 +11,7 @@ pub struct AluOpResult<Value> {
 }
 
 pub trait AluOneOp<Value>: AluOp {
-    fn execute(value: Value, cf: bool) -> AluOpResult<Value>;
+    fn execute(value: Value, nf: bool, hf: bool, cf: bool) -> AluOpResult<Value>;
 }
 
 pub trait AluTwoOp<DstValue, SrcValue>: AluOp {
@@ -29,7 +29,7 @@ impl AluOp for Inc {
 }
 
 impl AluOneOp<u8> for Inc {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value.wrapping_add(1);
 
         AluOpResult {
@@ -43,7 +43,7 @@ impl AluOneOp<u8> for Inc {
 }
 
 impl AluOneOp<u16> for Inc {
-    fn execute(value: u16, _: bool) -> AluOpResult<u16> {
+    fn execute(value: u16, _: bool, _: bool, _: bool) -> AluOpResult<u16> {
         let new_value = value.wrapping_add(1);
 
         AluOpResult {
@@ -63,7 +63,7 @@ impl AluOp for Dec {
 }
 
 impl AluOneOp<u8> for Dec {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value.wrapping_sub(1);
 
         AluOpResult {
@@ -77,7 +77,7 @@ impl AluOneOp<u8> for Dec {
 }
 
 impl AluOneOp<u16> for Dec {
-    fn execute(value: u16, _: bool) -> AluOpResult<u16> {
+    fn execute(value: u16, _: bool, _: bool, _: bool) -> AluOpResult<u16> {
         let new_value = value.wrapping_sub(1);
 
         AluOpResult {
@@ -97,7 +97,7 @@ impl AluOp for Rlc {
 }
 
 impl AluOneOp<u8> for Rlc {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value.rotate_left(1);
 
         AluOpResult {
@@ -117,7 +117,7 @@ impl AluOp for Rl {
 }
 
 impl AluOneOp<u8> for Rl {
-    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
         let new_value = (value << 1) | (cf as u8);
 
         AluOpResult {
@@ -137,7 +137,7 @@ impl AluOp for Rrc {
 }
 
 impl AluOneOp<u8> for Rrc {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value.rotate_right(1);
 
         AluOpResult {
@@ -157,7 +157,7 @@ impl AluOp for Rr {
 }
 
 impl AluOneOp<u8> for Rr {
-    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
         let new_value = (value >> 1) | ((cf as u8) << 7);
 
         AluOpResult {
@@ -177,7 +177,7 @@ impl AluOp for Sla {
 }
 
 impl AluOneOp<u8> for Sla {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value << 1;
 
         AluOpResult {
@@ -197,7 +197,7 @@ impl AluOp for Sra {
 }
 
 impl AluOneOp<u8> for Sra {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value >> 1 | (value & 0x80);
 
         AluOpResult {
@@ -217,7 +217,7 @@ impl AluOp for Swap {
 }
 
 impl AluOneOp<u8> for Swap {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = (value >> 4) | (value << 4);
 
         AluOpResult {
@@ -237,7 +237,7 @@ impl AluOp for Srl {
 }
 
 impl AluOneOp<u8> for Srl {
-    fn execute(value: u8, _: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
         let new_value = value >> 1;
 
         AluOpResult {
@@ -250,6 +250,36 @@ impl AluOneOp<u8> for Srl {
     }
 }
 
+pub struct RlcA {}
+
+impl AluOp for RlcA {
+    const STR: &'static str = "RLCA";
+}
+
+impl AluOneOp<u8> for RlcA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            zf: Some(false),
+            ..Rlc::execute(value, nf, hf, cf)
+        }
+    }
+}
+
+pub struct RrcA {}
+
+impl AluOp for RrcA {
+    const STR: &'static str = "RRCA";
+}
+
+impl AluOneOp<u8> for RrcA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            zf: Some(false),
+            ..Rrc::execute(value, nf, hf, cf)
+        }
+    }
+}
+
 pub struct RlA {}
 
 impl AluOp for RlA {
@@ -257,10 +287,79 @@ impl AluOp for RlA {
 }
 
 impl AluOneOp<u8> for RlA {
-    fn execute(value: u8, cf: bool) -> AluOpResult<u8> {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
         AluOpResult {
             zf: Some(false),
-            ..Rl::execute(value, cf)
+            ..Rl::execute(value, nf, hf, cf)
+        }
+    }
+}
+
+pub struct RrA {}
+
+impl AluOp for RrA {
+    const STR: &'static str = "RRA";
+}
+
+impl AluOneOp<u8> for RrA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+        AluOpResult {
+            zf: Some(false),
+            ..Rr::execute(value, nf, hf, cf)
+        }
+    }
+}
+
+pub struct Daa {}
+
+impl AluOp for Daa {
+    const STR: &'static str = "DAA";
+}
+
+impl AluOneOp<u8> for Daa {
+    fn execute(mut value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+        let mut new_carry = false;
+        if !nf {
+            if cf || value > 0x99 {
+                value = value.wrapping_add(0x60);
+                new_carry = true;
+            }
+            if hf || value & 0x0f > 0x09 {
+                value = value.wrapping_add(0x06);
+            }
+        } else if cf {
+            value = value.wrapping_add(if hf { 0x9a } else { 0xa0 });
+            new_carry = true;
+        } else if hf {
+            value = value.wrapping_add(0xfa);
+        }
+
+        AluOpResult {
+            value: Some(value),
+            zf: Some(value == 0),
+            nf: None,
+            hf: Some(false),
+            cf: Some(new_carry),
+        }
+    }
+}
+
+pub struct Cpl {}
+
+impl AluOp for Cpl {
+    const STR: &'static str = "CPL";
+}
+
+impl AluOneOp<u8> for Cpl {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+        let value = !value;
+
+        AluOpResult {
+            value: Some(value),
+            zf: None,
+            nf: Some(true),
+            hf: Some(true),
+            cf: None,
         }
     }
 }
@@ -281,6 +380,22 @@ impl AluTwoOp<u8, u8> for Add {
             nf: Some(false),
             hf: Some((a & 0xF).checked_add(b | 0xF).is_none()),
             cf: Some(new_carry),
+        }
+    }
+}
+
+impl AluTwoOp<u16, u16> for Add {
+    fn execute(a: u16, b: u16, _: bool) -> AluOpResult<u16> {
+        let (value, new_carry) = a.overflowing_add(b);
+
+        let hf_mask = (1u16 << 11) | (1u16 << 11).wrapping_sub(1);
+
+        AluOpResult {
+            value: Some(value),
+            zf: None,
+            nf: Some(false),
+            hf: Some((a & hf_mask) + (b & hf_mask) > hf_mask),
+            cf: Some(a > 0xFFFF - b),
         }
     }
 }

@@ -87,8 +87,11 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 )
                 .into()
             } else if q == 1 {
-                // TODO: ADD HL, rp[p]
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                format!(
+                    "&implementation::AluTwo::<alu::Add, operands::HL, {}>::new()",
+                    TABLE_RP[p as usize]
+                )
+                .into()
             } else {
                 unreachable!("Q > 1")
             }
@@ -157,22 +160,17 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         } else if z == 7 {
             #[allow(clippy::if_same_then_else)]
             if y == 0 {
-                // TODO: RLCA
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::RlcA, operands::A>::new()".into()
             } else if y == 1 {
-                // TODO: RRCA
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::RrcA, operands::A>::new()".into()
             } else if y == 2 {
                 "&implementation::AluOne::<alu::RlA, operands::A>::new()".into()
             } else if y == 3 {
-                // TODO: RRA
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::RrA, operands::A>::new()".into()
             } else if y == 4 {
-                // TODO: DAA
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::Daa, operands::A>::new()".into()
             } else if y == 5 {
-                // TODO: CPL
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluOne::<alu::Cpl, operands::A>::new()".into()
             } else if y == 6 {
                 // TODO: SCF
                 format!("&implementation::Invalid::<{opcode}, false>::new()").into()

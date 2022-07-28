@@ -43,7 +43,7 @@ where
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
         Box::new(AluExecution::<Op, Op, _, true>::Start(
             |_: Option<Op::Value>, value: Op::Value, registers: &mut Registers| {
-                AluOp::execute(value, registers.cf())
+                AluOp::execute(value, registers.nf(), registers.hf(), registers.cf())
             },
         ))
     }
