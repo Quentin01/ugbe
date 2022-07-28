@@ -393,7 +393,7 @@ impl AluOp for Or {
 
 impl AluTwoOp<u8, u8> for Or {
     fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
-        let value = a & b;
+        let value = a | b;
 
         AluOpResult {
             value: Some(value),
