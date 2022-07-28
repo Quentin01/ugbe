@@ -535,6 +535,9 @@ impl Ppu {
                             renderer.on();
                         } else {
                             renderer.off();
+
+                            self.mode = Mode::default();
+                            self.ly = 0;
                         }
                     }
                 }

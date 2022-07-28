@@ -130,7 +130,7 @@ pub trait Fetcher {
                     FetcherState::Sleep
                 }
             }
-            FetcherState::Sleep => FetcherState::GetTile{ elapsed_cycle: 0 },
+            FetcherState::Sleep => FetcherState::GetTile { elapsed_cycle: 0 },
         };
 
         std::mem::swap(self.state(), &mut new_state);
