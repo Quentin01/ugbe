@@ -47,6 +47,7 @@ impl GameboyBuilder {
             cpu: cpu::Cpu::new(),
             hardware: hardware::Hardware::new(self.boot_rom, self.cartbridge, self.renderer),
             bus: bus::Bus::new(),
+            t_cycle_count: 0,
         }
     }
 }
@@ -55,19 +56,22 @@ pub struct Gameboy {
     cpu: cpu::Cpu,
     hardware: hardware::Hardware,
     bus: bus::Bus,
+    t_cycle_count: usize,
 }
 
 impl Gameboy {
-    pub fn run(&mut self, cycle_count: usize) {
+    pub fn run(&mut self, t_cycle_count: usize) {
         // TODO: Currently the CPU is ticking every m-cycle and the hardware needs it every t-cycle
         //       In the future, this should be handled by ticking every t-cycle for each
-        for t_cycle in 0..cycle_count {
-            if t_cycle % 4 == 0 {
-                let memory_operation = self.cpu.tick(&self.bus);
+        for _ in 0..t_cycle_count {
+            if self.t_cycle_count % 4 == 0 {
+                let memory_operation = self.cpu.tick(&self.bus, &self.hardware, &self.hardware.ppu);
                 self.bus.tick(memory_operation, &mut self.hardware);
             }
 
             self.hardware.tick();
+
+            self.t_cycle_count = self.t_cycle_count.wrapping_add(1)
         }
     }
 }
