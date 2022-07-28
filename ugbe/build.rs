@@ -230,8 +230,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                     // TODO: RETI
                     format!("&implementation::Invalid::<{opcode}, false>::new()").into()
                 } else if p == 2 {
-                    // TODO: JP HL
-                    format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                    "&implementation::Jp::<condition::None, operands::HL, false>::new()".into()
                 } else if p == 3 {
                     "&implementation::Ld::<operands::SP, operands::HL>::new()".into()
                 } else {
@@ -242,8 +241,11 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             }
         } else if z == 2 {
             if (0..=3).contains(&y) {
-                // TODO: JP cc[y], nn
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                format!(
+                    "&implementation::Jp::<{}, operands::Imm16>::new()",
+                    TABLE_CC[y as usize]
+                )
+                .into()
             } else if y == 4 {
                 "&implementation::Ld::<operands::DerefC, operands::A>::new()".into()
             } else if y == 5 {
@@ -258,8 +260,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         } else if z == 3 {
             #[allow(clippy::if_same_then_else)]
             if y == 0 {
-                // TODO: JP nn
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::Jp::<condition::None, operands::Imm16>::new()".into()
             } else if y == 1 {
                 // CB prefix already handled by the CPU
                 format!("&implementation::Invalid::<{opcode}, false>::new()").into()

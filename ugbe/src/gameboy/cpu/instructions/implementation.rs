@@ -1,6 +1,7 @@
 mod alu;
 mod call;
 mod invalid;
+mod jp;
 mod jr;
 mod ld;
 mod nop;
@@ -11,6 +12,7 @@ mod ret;
 pub use alu::{AluBit, AluOne, AluTwo};
 pub use call::Call;
 pub use invalid::Invalid;
+pub use jp::Jp;
 pub use jr::Jr;
 pub use ld::Ld;
 pub use nop::Nop;
