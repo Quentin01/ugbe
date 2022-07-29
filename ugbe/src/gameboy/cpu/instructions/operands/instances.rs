@@ -7,7 +7,7 @@ use super::super::super::registers::Registers;
 use super::{
     DerefDecOperand, DerefIncOperand, DerefOperand, DerefOperandToU16, Operand, OperandImmediate,
     OperandIn, OperandOut, OperandReadExecution, OperandRegister, OperandWriteExecution,
-    ReadImmediate, ReadRegister, WriteRegister,
+    ReadImmediate, ReadR16PlusOff8, ReadRegister, WriteRegister,
 };
 
 macro_rules! define_immediate {
@@ -179,3 +179,19 @@ define_register_16!(BC);
 define_register_16!(DE);
 define_register_16!(HL);
 define_register_16!(SP);
+
+pub struct SPPlusOff8 {}
+
+impl Operand for SPPlusOff8 {
+    type Value = u16;
+
+    fn str() -> Cow<'static, str> {
+        "SP+i8".into()
+    }
+}
+
+impl OperandIn for SPPlusOff8 {
+    fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+        Box::new(ReadR16PlusOff8::<SP, Off8>::Start(PhantomData))
+    }
+}

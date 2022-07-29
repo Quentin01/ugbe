@@ -205,13 +205,11 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             } else if y == 4 {
                 "&implementation::Ld::<operands::DerefImm8, operands::A>::new()".into()
             } else if y == 5 {
-                // TODO: ADD SP, d
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::AluTwo::<alu::Add, operands::SP, operands::Off8>::new()".into()
             } else if y == 6 {
                 "&implementation::Ld::<operands::A, operands::DerefImm8>::new()".into()
             } else if y == 7 {
-                // TODO: LD HL, SP+d
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::Ld::<operands::HL, operands::SPPlusOff8>::new()".into()
             } else {
                 unreachable!("Y > 7")
             }

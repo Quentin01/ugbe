@@ -436,6 +436,24 @@ impl AluTwoOp<u16, u16> for Add {
     }
 }
 
+impl AluTwoOp<u16, i8> for Add {
+    fn execute(a: u16, b: i8, _: bool) -> AluOpResult<u16> {
+        let b = b as u16;
+        let value = a.wrapping_add(b);
+
+        let hf_mask = (1u16 << 3) | (1u16 << 3).wrapping_sub(1);
+        let cf_mask = (1u16 << 7) | (1u16 << 7).wrapping_sub(1);
+
+        AluOpResult {
+            value: Some(value),
+            zf: Some(false),
+            nf: Some(false),
+            hf: Some((a & hf_mask) + (b & hf_mask) > hf_mask),
+            cf: Some((a & cf_mask) + (b & cf_mask) > cf_mask),
+        }
+    }
+}
+
 pub struct Adc {}
 
 impl AluOp for Adc {

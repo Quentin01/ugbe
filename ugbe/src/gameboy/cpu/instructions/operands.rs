@@ -13,6 +13,6 @@ pub use general::{
 
 pub use registers::{OperandRegister, ReadRegister, WriteRegister};
 
-pub use immediate::{OperandImmediate, ReadImmediate};
+pub use immediate::{OperandImmediate, ReadImmediate, ReadR16PlusOff8};
 
 pub use instances::*;
