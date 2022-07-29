@@ -7,14 +7,14 @@ use super::super::super::registers::Registers;
 use super::super::condition::Condition;
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
-pub struct Ret<Cond>
+pub struct Ret<Cond, const ENABLE_INTERRUPT: bool = false>
 where
     Cond: Condition + 'static,
 {
     phantom: PhantomData<Cond>,
 }
 
-impl<Cond> Ret<Cond>
+impl<Cond, const ENABLE_INTERRUPT: bool> Ret<Cond, ENABLE_INTERRUPT>
 where
     Cond: Condition + 'static,
 {
@@ -25,7 +25,7 @@ where
     }
 }
 
-impl<Cond> Instruction for Ret<Cond>
+impl<Cond, const ENABLE_INTERRUPT: bool> Instruction for Ret<Cond, ENABLE_INTERRUPT>
 where
     Cond: Condition + 'static,
 {
@@ -38,11 +38,11 @@ where
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
-        Box::new(RetExecution::<Cond>::Start(PhantomData))
+        Box::new(RetExecution::<Cond, ENABLE_INTERRUPT>::Start(PhantomData))
     }
 }
 
-enum RetExecution<Cond>
+enum RetExecution<Cond, const ENABLE_INTERRUPT: bool = false>
 where
     Cond: Condition + 'static,
 {
@@ -54,7 +54,8 @@ where
     Complete,
 }
 
-impl<Cond> InstructionExecution for RetExecution<Cond>
+impl<Cond, const ENABLE_INTERRUPT: bool> InstructionExecution
+    for RetExecution<Cond, ENABLE_INTERRUPT>
 where
     Cond: Condition + 'static,
 {
@@ -95,6 +96,10 @@ where
             Self::SettingPC(lsb) => {
                 let pc = u16::from_be_bytes([data_bus, lsb]);
                 registers.set_pc(pc);
+
+                if ENABLE_INTERRUPT {
+                    // TODO: Set IME
+                }
 
                 let _ = std::mem::replace(self, Self::Complete);
                 InstructionExecutionState::Yield(MemoryOperation::None)

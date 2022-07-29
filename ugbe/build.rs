@@ -221,8 +221,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 if p == 0 {
                     "&implementation::Ret::<condition::None>::new()".into()
                 } else if p == 1 {
-                    // TODO: RETI
-                    format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                    "&implementation::Ret::<condition::None, true>::new()".into()
                 } else if p == 2 {
                     "&implementation::Jp::<condition::None, operands::HL, false>::new()".into()
                 } else if p == 3 {
