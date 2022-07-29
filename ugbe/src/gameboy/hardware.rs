@@ -87,7 +87,7 @@ impl super::mmu::Mmu for Hardware {
             0xFF49 => self.ppu.write_obp1(value),
             0xFF4A => self.ppu.write_wy(value),
             0xFF4B => self.ppu.write_wx(value),
-            0xFF50 => self.boot_rom_enabled = value & 0x1 == 0x1,
+            0xFF50 => self.boot_rom_enabled = value & 0x1 == 0x0,
             // TODO: Handle memory correctly
             _ => {
                 // println!(
