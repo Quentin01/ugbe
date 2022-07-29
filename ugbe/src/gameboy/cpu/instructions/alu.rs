@@ -69,7 +69,7 @@ impl AluOneOp<u8> for Dec {
         AluOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
-            nf: Some(false),
+            nf: Some(true),
             hf: Some(value & 0xF == 0x0),
             cf: None,
         }
@@ -245,7 +245,7 @@ impl AluOneOp<u8> for Srl {
             zf: Some(new_value == 0),
             nf: Some(false),
             hf: Some(false),
-            cf: Some(value & 0x1 == 0),
+            cf: Some(value & 0x1 == 0x1),
         }
     }
 }
@@ -414,7 +414,7 @@ impl AluTwoOp<u8, u8> for Add {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
-            hf: Some((a & 0xF).checked_add(b | 0xF).is_none()),
+            hf: Some((a & 0xF) + (b & 0xF) > 0xF),
             cf: Some(new_carry),
         }
     }
@@ -490,7 +490,7 @@ impl AluTwoOp<u8, u8> for Sbc {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(true),
-            hf: Some((a & 0xF).wrapping_sub(b & 0xF) & 0x10 != 0),
+            hf: Some((a & 0xF).wrapping_sub(b & 0xF).wrapping_sub(cf as u8) & 0x10 != 0),
             cf: Some((a as u16) < (b as u16) + (cf as u16)),
         }
     }
