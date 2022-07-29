@@ -300,8 +300,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             )
             .into()
         } else {
-            // TODO: RST y*8
-            format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+            format!("&implementation::Rst::<{}>::new()", y * 8).into()
         }
     } else {
         unreachable!("X > 3")

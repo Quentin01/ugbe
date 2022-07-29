@@ -8,6 +8,7 @@ mod nop;
 mod pop;
 mod push;
 mod ret;
+mod rst;
 
 pub use alu::{AluBit, AluOne, AluTwo};
 pub use call::Call;
@@ -19,3 +20,4 @@ pub use nop::Nop;
 pub use pop::Pop;
 pub use push::Push;
 pub use ret::Ret;
+pub use rst::Rst;
