@@ -42,7 +42,7 @@ impl Cpu {
         match &mut self.state {
             State::NotStarted => self.prefetch_next(false),
             State::WaitingPrefetchRead(cb_prefixed) => {
-                if bus.data() == 0xCB {
+                if !*cb_prefixed && bus.data() == 0xCB {
                     return self.prefetch_next(true);
                 }
 
