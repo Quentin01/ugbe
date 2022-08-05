@@ -21,7 +21,12 @@ impl<T: Copy + Clone, const SIZE: usize> Fifo<T, SIZE> {
     }
 
     pub fn push(&mut self, data: T) {
-        debug_assert!(self.size != SIZE, "Trying to push to a full FIFO");
+        assert!(
+            self.size != SIZE,
+            "Trying to push to a full FIFO (start={}, size={})",
+            self.start,
+            self.size
+        );
 
         let idx = self.start.wrapping_add(self.size) % SIZE;
         self.data[idx] = Some(data);
@@ -29,7 +34,12 @@ impl<T: Copy + Clone, const SIZE: usize> Fifo<T, SIZE> {
     }
 
     pub fn pop(&mut self) -> T {
-        debug_assert!(self.size != 0, "Trying to pop from a FIFO without any more values to pop");
+        assert!(
+            self.size != 0,
+            "Trying to pop from a FIFO without any more values to pop (start={}, size={})",
+            self.start,
+            self.size
+        );
 
         let value = self.data[self.start]
             .take()
@@ -55,7 +65,9 @@ impl<T: Copy + Clone, const SIZE: usize> Index<usize> for Fifo<T, SIZE> {
         }
 
         let index = self.start.wrapping_add(index) % SIZE;
-        self.data[index].as_ref().expect("Expected a data in the FIFO at this index")
+        self.data[index]
+            .as_ref()
+            .expect("Expected a data in the FIFO at this index")
     }
 }
 
@@ -66,6 +78,34 @@ impl<T: Copy + Clone, const SIZE: usize> IndexMut<usize> for Fifo<T, SIZE> {
         }
 
         let index = self.start.wrapping_add(index) % SIZE;
-        self.data[index].as_mut().expect("Expected a data in the FIFO at this index")
+        self.data[index]
+            .as_mut()
+            .expect("Expected a data in the FIFO at this index")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Fifo;
+
+    #[test]
+    fn basic_fifo() {
+        const VALUES: [u8; 8] = [0, 1, 2, 3, 4, 5, 6, 7];
+
+        let mut fifo = Fifo::<u8, 8>::new();
+
+        for (idx, value) in VALUES.into_iter().enumerate() {
+            fifo.push(value);
+
+            assert_eq!(fifo.len(), idx + 1);
+            assert_eq!(fifo[idx], value);
+        }
+
+        for (idx, value) in VALUES.into_iter().enumerate() {
+            let popped_value = fifo.pop();
+
+            assert_eq!(popped_value, value);
+            assert_eq!(fifo.len(), 7 - idx);
+        }
     }
 }
