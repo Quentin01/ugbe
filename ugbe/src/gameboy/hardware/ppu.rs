@@ -292,7 +292,13 @@ impl Mode {
                 }
 
                 if lx >= 160 {
-                    Mode::switch_from_drawing_to_hblank(ppu, elapsed_cycles, wy_match_ly, win_ly)
+                    Mode::switch_from_drawing_to_hblank(
+                        ppu,
+                        interrupt_line,
+                        elapsed_cycles,
+                        wy_match_ly,
+                        win_ly,
+                    )
                 } else {
                     Mode::Drawing {
                         sprite_buffer,
@@ -319,7 +325,12 @@ impl Mode {
                     if ppu.ly >= 143 {
                         Self::switch_from_hblank_to_vblank(ppu, interrupt_line)
                     } else {
-                        Self::switch_from_hblank_to_oam_scan(ppu, wy_match_ly, win_ly)
+                        Self::switch_from_hblank_to_oam_scan(
+                            ppu,
+                            interrupt_line,
+                            wy_match_ly,
+                            win_ly,
+                        )
                     }
                 } else {
                     Mode::HBlank {
@@ -340,8 +351,12 @@ impl Mode {
                     ppu.ly += 1;
                     elapsed_cycles_line = 0;
 
+                    if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
+                        interrupt_line.request(InterruptKind::Stat);
+                    }
+
                     if ly == 153 {
-                        Self::switch_from_vblank_to_oam_scan(ppu)
+                        Self::switch_from_vblank_to_oam_scan(ppu, interrupt_line)
                     } else {
                         Mode::VBlank {
                             elapsed_cycles_line,
@@ -352,6 +367,10 @@ impl Mode {
                     if elapsed_cycles_line == 4 && ly == 153 {
                         // Simulate that the VBlank change LY to 0 after 4 T-cycles in the line 153
                         ppu.ly = 0;
+
+                        if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
+                            interrupt_line.request(InterruptKind::Stat);
+                        }
                     }
 
                     Mode::VBlank {
@@ -369,7 +388,6 @@ impl Mode {
         wy_match_ly: bool,
         win_ly: u8,
     ) -> Mode {
-        // TODO: Interrupts?
         sprite_buffer.sort();
 
         Mode::Drawing {
@@ -390,12 +408,16 @@ impl Mode {
     }
 
     fn switch_from_drawing_to_hblank(
-        _: &mut Ppu,
+        ppu: &mut Ppu,
+        interrupt_line: &mut dyn InterruptLine,
         elapsed_cycles: usize,
         wy_match_ly: bool,
         win_ly: u8,
     ) -> Mode {
-        // TODO: Interrupts?
+        if ppu.stat.hblank_interrupt_enabled() {
+            interrupt_line.request(InterruptKind::Stat);
+        }
+
         Mode::HBlank {
             elapsed_cycles,
             win_ly,
@@ -408,6 +430,9 @@ impl Mode {
         if ppu.stat.vblank_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
+        if ppu.stat.oam_scanning_interrupt_enabled() {
+            interrupt_line.request(InterruptKind::Stat);
+        }
 
         Mode::VBlank {
             elapsed_cycles_line: 0,
@@ -415,10 +440,21 @@ impl Mode {
         }
     }
 
-    fn switch_from_hblank_to_oam_scan(ppu: &mut Ppu, wy_match_ly: bool, win_ly: u8) -> Mode {
-        // TODO: Interrupts?
+    fn switch_from_hblank_to_oam_scan(
+        ppu: &mut Ppu,
+        interrupt_line: &mut dyn InterruptLine,
+        wy_match_ly: bool,
+        win_ly: u8,
+    ) -> Mode {
+        if ppu.stat.oam_scanning_interrupt_enabled() {
+            interrupt_line.request(InterruptKind::Stat);
+        }
 
         ppu.ly += 1;
+
+        if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
+            interrupt_line.request(InterruptKind::Stat);
+        }
 
         Self::OAMScan {
             sprite_buffer: [None; 10],
@@ -430,8 +466,13 @@ impl Mode {
         }
     }
 
-    fn switch_from_vblank_to_oam_scan(ppu: &mut Ppu) -> Mode {
-        // TODO: Interrupts?
+    fn switch_from_vblank_to_oam_scan(
+        ppu: &mut Ppu,
+        interrupt_line: &mut dyn InterruptLine,
+    ) -> Mode {
+        if ppu.stat.oam_scanning_interrupt_enabled() {
+            interrupt_line.request(InterruptKind::Stat);
+        }
 
         match ppu.renderer.as_mut() {
             Some(renderer) => renderer.vblank(&ppu.screen),
