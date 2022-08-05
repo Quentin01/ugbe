@@ -9,12 +9,17 @@ mod registers;
 pub mod screen;
 mod tiling;
 
-use fetcher::Fetcher;
-
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ColorId {
     msb: bool,
     lsb: bool,
+}
+
+impl ColorId {
+    const ZERO: ColorId = ColorId {
+        msb: false,
+        lsb: false,
+    };
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -48,6 +53,28 @@ impl PartialEq for Sprite {
 }
 
 impl Eq for Sprite {}
+
+impl Sprite {
+    fn palette(&self, ppu: &Ppu) -> Palette {
+        if self.attr & (1 << 4) == 0 {
+            ppu.obp0
+        } else {
+            ppu.obp1
+        }
+    }
+
+    fn x_flip(&self) -> bool {
+        self.attr & (1 << 5) != 0
+    }
+
+    fn y_flip(&self) -> bool {
+        self.attr & (1 << 6) != 0
+    }
+
+    fn over_bg_and_win(&self) -> bool {
+        self.attr & (1 << 7) == 0
+    }
+}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Palette(u8);
@@ -98,6 +125,8 @@ pub enum Mode {
         win_fetcher: bool,
         bg_win_fetcher: fetcher::BackgroundWindowFetcher,
         bg_win_fifo: fifo::Fifo<fetcher::BackgroundWindowPixel, 8>,
+        sprite_fetcher: Option<fetcher::SpriteFetcher>,
+        sprite_fifo: fifo::Fifo<fetcher::SpritePixel, 8>,
         win_ly: u8,
     },
     HBlank {
@@ -187,7 +216,7 @@ impl Mode {
 
                         let sprite_height = ppu.lcdc.sprite_height();
 
-                        if (current_sprite.y..=(current_sprite.y + sprite_height))
+                        if (current_sprite.y..(current_sprite.y + sprite_height))
                             .contains(&(ppu.ly + 16))
                         {
                             sprite_buffer[sprite_buffer_idx] = Some(current_sprite);
@@ -223,43 +252,65 @@ impl Mode {
                 mut win_fetcher,
                 mut bg_win_fetcher,
                 mut bg_win_fifo,
+                mut sprite_fetcher,
+                mut sprite_fifo,
                 mut win_ly,
             } => {
                 elapsed_cycles += 1;
 
-                // TODO: If we have a sprite fetcher, don't fetch the next sprite to render
+                if sprite_fetcher.is_none() {
+                    // Fetch the sprite that could be render starting at lx
+                    // For that we need to disable the warning of clippy telling us that our loop is executed only once as we don't have labelled block yet
+                    #[allow(clippy::never_loop)]
+                    let sprite_to_render = 'fetch_sprite_to_render: loop {
+                        if !ppu.lcdc.display_sprite() {
+                            break 'fetch_sprite_to_render None;
+                        }
 
-                // Fetch the sprite that could be render starting at lx
-                // For that we need to disable the warning of clippy telling us that our loop is executed only once as we don't have labelled block yet
-                #[allow(clippy::never_loop)]
-                let sprite_to_render = 'fetch_sprite_to_render: loop {
-                    if !ppu.lcdc.display_sprite() {
-                        break 'fetch_sprite_to_render None;
-                    }
-
-                    for sprite_opt in sprite_buffer.iter_mut() {
-                        match sprite_opt {
-                            Some(sprite) => {
-                                if sprite.x <= lx + 8 {
-                                    break 'fetch_sprite_to_render sprite_opt.take();
+                        for sprite_opt in sprite_buffer.iter_mut() {
+                            match sprite_opt {
+                                Some(sprite) => {
+                                    if sprite.x <= lx + 8 {
+                                        break 'fetch_sprite_to_render sprite_opt.take();
+                                    }
+                                }
+                                None => {
+                                    continue;
                                 }
                             }
-                            None => continue,
                         }
-                    }
 
-                    break 'fetch_sprite_to_render None;
-                };
+                        break 'fetch_sprite_to_render None;
+                    };
 
-                match sprite_to_render {
-                    Some(_) => {
-                        // TODO: Start a sprite fetcher (reset the BG fetcher to step 1 but do not empty the BG fifo)
-                        todo!("Implement sprite fetcher that will return early")
+                    match sprite_to_render {
+                        Some(sprite) => {
+                            bg_win_fetcher.reset();
+                            sprite_fetcher = Some(fetcher::SpriteFetcher::new(sprite, ppu));
+                        }
+                        None => {}
                     }
-                    None => {}
                 }
 
-                // TODO: If we have a sprite fetcher, use it
+                if let Some(fetcher) = &mut sprite_fetcher {
+                    if !fetcher.tick(ppu, lx, &mut sprite_fifo) {
+                        return Mode::Drawing {
+                            sprite_buffer,
+                            wy_match_ly,
+                            scx_delay,
+                            lx,
+                            elapsed_cycles,
+                            win_fetcher,
+                            bg_win_fetcher,
+                            bg_win_fifo,
+                            sprite_fetcher,
+                            sprite_fifo,
+                            win_ly,
+                        };
+                    }
+
+                    sprite_fetcher = None;
+                }
 
                 // Check if we need to start fetching the window
                 if ppu.lcdc.display_window() && wy_match_ly && lx == ppu.wx - 7 && !win_fetcher {
@@ -280,13 +331,30 @@ impl Mode {
                 if bg_win_fifo.len() > 0 {
                     if scx_delay != 0 {
                         bg_win_fifo.pop();
+
+                        if sprite_fifo.len() > 0 {
+                            sprite_fifo.pop();
+                        }
+
                         scx_delay -= 1;
                     } else {
                         let bg_pixel = bg_win_fifo.pop();
 
-                        // TODO: Mix with sprite fifo
-                        ppu.screen
-                            .set_pixel(lx.into(), ppu.ly.into(), bg_pixel.color());
+                        let pixel_color = if sprite_fifo.len() > 0 {
+                            let sprite_pixel = sprite_fifo.pop();
+
+                            if sprite_pixel.is_zero()
+                                || (!sprite_pixel.over_bg_and_win() && !bg_pixel.is_zero())
+                            {
+                                bg_pixel.color()
+                            } else {
+                                sprite_pixel.color()
+                            }
+                        } else {
+                            bg_pixel.color()
+                        };
+
+                        ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
                         lx = lx.wrapping_add(1)
                     }
                 }
@@ -309,6 +377,8 @@ impl Mode {
                         win_fetcher,
                         bg_win_fetcher,
                         bg_win_fifo,
+                        sprite_fetcher,
+                        sprite_fifo,
                         win_ly,
                     }
                 }
@@ -403,6 +473,8 @@ impl Mode {
                 ppu.ly.wrapping_add(ppu.scy),
             ),
             bg_win_fifo: fifo::Fifo::new(),
+            sprite_fetcher: None,
+            sprite_fifo: fifo::Fifo::new(),
             win_ly,
         }
     }

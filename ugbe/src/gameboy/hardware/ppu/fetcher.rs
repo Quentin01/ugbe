@@ -25,31 +25,63 @@ pub struct PixelPosition {
     y: u8,
 }
 
-pub trait FetcherPixel {
-    fn new(ppu: &super::Ppu, color_id: super::ColorId) -> Self;
+#[derive(Debug, Copy, Clone)]
+pub struct BackgroundWindowPixel {
+    color_id: super::ColorId,
+    palette: super::Palette,
 }
 
-pub trait Fetcher {
-    type Pixel: FetcherPixel + Copy;
-
-    fn default_state() -> FetcherState {
-        FetcherState::GetTile { elapsed_cycle: 0 }
+impl BackgroundWindowPixel {
+    fn new(ppu: &super::Ppu, color_id: super::ColorId) -> Self {
+        BackgroundWindowPixel {
+            color_id,
+            palette: ppu.bgp,
+        }
     }
 
-    fn state(&mut self) -> &mut FetcherState;
+    pub fn is_zero(&self) -> bool {
+        self.color_id == super::ColorId::ZERO
+    }
 
-    fn tile_map(&self, ppu: &super::Ppu) -> &super::tiling::TileMap;
-    fn pixel_position(&mut self) -> &mut PixelPosition;
+    pub fn color(&self) -> super::screen::Color {
+        self.palette[self.color_id]
+    }
+}
 
-    fn tick(&mut self, ppu: &super::Ppu, fifo: &mut super::fifo::Fifo<Self::Pixel, 8>) {
-        let mut new_state = match *self.state() {
+#[derive(Debug, Copy, Clone)]
+pub struct BackgroundWindowFetcher {
+    tile_map: super::tiling::TileMap,
+    position: PixelPosition,
+    state: FetcherState,
+}
+
+impl BackgroundWindowFetcher {
+    pub fn new(tile_map: super::tiling::TileMap, x: u8, y: u8) -> Self {
+        Self {
+            tile_map,
+            position: PixelPosition { x, y },
+            state: FetcherState::GetTile { elapsed_cycle: 0 },
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.state = FetcherState::GetTile { elapsed_cycle: 0 };
+    }
+
+    pub fn tick(
+        &mut self,
+        ppu: &super::Ppu,
+        fifo: &mut super::fifo::Fifo<BackgroundWindowPixel, 8>,
+    ) {
+        let mut new_state = match self.state {
             FetcherState::GetTile { elapsed_cycle } => {
                 if elapsed_cycle == 1 {
                     let tile_position = super::tiling::TilePosition {
-                        x: self.pixel_position().x / 8,
-                        y: self.pixel_position().y / 8,
+                        x: self.position.x / 8,
+                        y: self.position.y / 8,
                     };
-                    let tile_no = self.tile_map(ppu).tile_number(ppu, &tile_position);
+
+                    let tile_no = self.tile_map.tile_number(ppu, &tile_position);
                     FetcherState::GetTileDataLow {
                         elapsed_cycle: 0,
                         tile_no,
@@ -65,7 +97,7 @@ pub trait Fetcher {
                 tile_no,
             } => {
                 if elapsed_cycle == 1 {
-                    let row = self.pixel_position().y % 8;
+                    let row = self.position.y % 8;
                     let tile_low_row_data = ppu
                         .lcdc
                         .bg_and_window_tile_data_map()
@@ -90,7 +122,7 @@ pub trait Fetcher {
                 tile_low_row_data,
             } => {
                 if elapsed_cycle == 1 {
-                    let row = self.pixel_position().y % 8;
+                    let row = self.position.y % 8;
                     let tile_high_row_data = ppu
                         .lcdc
                         .bg_and_window_tile_data_map()
@@ -123,74 +155,188 @@ pub trait Fetcher {
                         super::tiling::tile_pixel_row(tile_high_row_data, tile_low_row_data);
 
                     for pixel_color_id in pixel_row.into_iter() {
-                        fifo.push(Self::Pixel::new(ppu, pixel_color_id));
+                        if ppu.lcdc.display_bg() {
+                            fifo.push(BackgroundWindowPixel::new(ppu, pixel_color_id));
+                        } else {
+                            fifo.push(BackgroundWindowPixel::new(ppu, super::ColorId::ZERO));
+                        }
                     }
 
-                    self.pixel_position().x += 8;
+                    self.position.x += 8;
                     FetcherState::Sleep
                 }
             }
             FetcherState::Sleep => FetcherState::GetTile { elapsed_cycle: 0 },
         };
 
-        std::mem::swap(self.state(), &mut new_state);
+        std::mem::swap(&mut self.state, &mut new_state);
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct BackgroundWindowPixel {
+pub struct SpritePixel {
     color_id: super::ColorId,
     palette: super::Palette,
+    over_bg_and_win: bool,
 }
 
-impl FetcherPixel for BackgroundWindowPixel {
-    fn new(ppu: &super::Ppu, color_id: super::ColorId) -> Self {
-        BackgroundWindowPixel {
+impl SpritePixel {
+    fn new(palette: super::Palette, color_id: super::ColorId, over_bg_and_win: bool) -> Self {
+        SpritePixel {
             color_id,
-            palette: ppu.bgp,
+            palette,
+            over_bg_and_win,
         }
     }
-}
 
-impl BackgroundWindowPixel {
+    pub fn is_zero(&self) -> bool {
+        self.color_id == super::ColorId::ZERO
+    }
+
+    pub fn over_bg_and_win(&self) -> bool {
+        self.over_bg_and_win
+    }
+
     pub fn color(&self) -> super::screen::Color {
         self.palette[self.color_id]
     }
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct BackgroundWindowFetcher {
-    tile_map: super::tiling::TileMap,
-    position: PixelPosition,
+pub struct SpriteFetcher {
+    sprite: super::Sprite,
     state: FetcherState,
+    pixel_row: u8,
 }
 
-impl BackgroundWindowFetcher {
-    pub fn new(tile_map: super::tiling::TileMap, x: u8, y: u8) -> Self {
+impl SpriteFetcher {
+    pub fn new(sprite: super::Sprite, ppu: &super::Ppu) -> Self {
+        let pixel_row = if sprite.y_flip() {
+            ppu.lcdc.sprite_height() - ppu.ly.wrapping_sub(sprite.y.wrapping_sub(16)) - 1
+        } else {
+            ppu.ly.wrapping_sub(sprite.y.wrapping_sub(16))
+        };
+
         Self {
-            tile_map,
-            position: PixelPosition { x, y },
-            state: Self::default_state(),
+            sprite,
+            state: FetcherState::GetTile { elapsed_cycle: 0 },
+            pixel_row,
         }
     }
 
-    pub fn reset(&mut self) {
-        self.state = Self::default_state();
-    }
-}
+    pub fn tick(
+        &mut self,
+        ppu: &super::Ppu,
+        lx: u8,
+        fifo: &mut super::fifo::Fifo<SpritePixel, 8>,
+    ) -> bool {
+        let mut new_state = match self.state {
+            FetcherState::GetTile { elapsed_cycle } => {
+                if elapsed_cycle == 1 {
+                    let tile_no = self.sprite.tile_no;
 
-impl Fetcher for BackgroundWindowFetcher {
-    type Pixel = BackgroundWindowPixel;
+                    FetcherState::GetTileDataLow {
+                        elapsed_cycle: 0,
+                        tile_no,
+                    }
+                } else {
+                    FetcherState::GetTile {
+                        elapsed_cycle: elapsed_cycle + 1,
+                    }
+                }
+            }
+            FetcherState::GetTileDataLow {
+                elapsed_cycle,
+                tile_no,
+            } => {
+                if elapsed_cycle == 1 {
+                    let row = self.pixel_row;
+                    let tile_low_row_data = ppu
+                        .lcdc
+                        .obj_tile_data_map()
+                        .tile(ppu, &tile_no)
+                        .get_low_row_data(row);
 
-    fn tile_map(&self, _: &super::Ppu) -> &super::tiling::TileMap {
-        &self.tile_map
-    }
+                    FetcherState::GetTileDataHigh {
+                        elapsed_cycle: 0,
+                        tile_no,
+                        tile_low_row_data,
+                    }
+                } else {
+                    FetcherState::GetTileDataLow {
+                        elapsed_cycle: elapsed_cycle + 1,
+                        tile_no,
+                    }
+                }
+            }
+            FetcherState::GetTileDataHigh {
+                elapsed_cycle,
+                tile_no,
+                tile_low_row_data,
+            } => {
+                if elapsed_cycle == 1 {
+                    let row = self.pixel_row;
+                    let tile_high_row_data = ppu
+                        .lcdc
+                        .obj_tile_data_map()
+                        .tile(ppu, &tile_no)
+                        .get_high_row_data(row);
 
-    fn pixel_position(&mut self) -> &mut PixelPosition {
-        &mut self.position
-    }
+                    FetcherState::Push {
+                        tile_low_row_data,
+                        tile_high_row_data,
+                    }
+                } else {
+                    FetcherState::GetTileDataHigh {
+                        elapsed_cycle: elapsed_cycle + 1,
+                        tile_no,
+                        tile_low_row_data,
+                    }
+                }
+            }
+            FetcherState::Push {
+                tile_low_row_data,
+                tile_high_row_data,
+            } => {
+                let pixel_row =
+                    super::tiling::tile_pixel_row(tile_high_row_data, tile_low_row_data);
 
-    fn state(&mut self) -> &mut FetcherState {
-        &mut self.state
+                let mut pixel_row_normal_it;
+                let mut pixel_row_rev_it;
+
+                let pixel_row_it: &mut dyn Iterator<Item = super::ColorId> = if self.sprite.x_flip()
+                {
+                    let x_offset = (self.sprite.x - 8 - lx) as usize;
+                    pixel_row_rev_it = pixel_row.into_iter().skip(x_offset).rev();
+                    &mut pixel_row_rev_it
+                } else {
+                    let x_offset = (self.sprite.x - 8 - lx) as usize;
+                    pixel_row_normal_it = pixel_row.into_iter().skip(x_offset);
+                    &mut pixel_row_normal_it
+                };
+
+                for (idx, pixel_color_id) in pixel_row_it.enumerate() {
+                    let pixel = SpritePixel::new(
+                        self.sprite.palette(ppu),
+                        pixel_color_id,
+                        self.sprite.over_bg_and_win(),
+                    );
+
+                    if fifo.len() > idx {
+                        if fifo[idx].is_zero() {
+                            fifo[idx] = pixel;
+                        }
+                    } else {
+                        fifo.push(pixel);
+                    }
+                }
+
+                FetcherState::Sleep
+            }
+            FetcherState::Sleep => return true,
+        };
+
+        std::mem::swap(&mut self.state, &mut new_state);
+        false
     }
 }
