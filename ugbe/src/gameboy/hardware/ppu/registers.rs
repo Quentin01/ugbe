@@ -56,11 +56,22 @@ impl Lcdc {
         }
     }
 
-    pub fn bg_and_window_tile_data_map(&self) -> super::tiling::TileDataMap<16> {
+    pub fn bg_and_window_tile_data_map(&self) -> super::tiling::TileDataMap {
         match ((self.0 >> Lcdc::BG_AND_WINDOW_TILE_DATA_SELECT_BIT_POS) & 0x1) != 0 {
-            true => super::tiling::TileDataMap::new(super::tiling::TileDataMapMethod::Method8000),
-            false => super::tiling::TileDataMap::new(super::tiling::TileDataMapMethod::Method8800),
+            true => {
+                super::tiling::TileDataMap::new(super::tiling::TileDataMapMethod::Method8000, 16)
+            }
+            false => {
+                super::tiling::TileDataMap::new(super::tiling::TileDataMapMethod::Method8800, 16)
+            }
         }
+    }
+
+    pub fn obj_tile_data_map(&self) -> super::tiling::TileDataMap {
+        super::tiling::TileDataMap::new(
+            super::tiling::TileDataMapMethod::Method8000,
+            self.sprite_height() * 2,
+        )
     }
 
     pub fn lcd_enabled(&self) -> bool {
