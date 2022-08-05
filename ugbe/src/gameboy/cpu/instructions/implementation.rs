@@ -1,5 +1,7 @@
 mod alu;
 mod call;
+mod di;
+mod ei;
 mod invalid;
 mod jp;
 mod jr;
@@ -12,6 +14,8 @@ mod rst;
 
 pub use alu::{AluBit, AluOne, AluTwo};
 pub use call::Call;
+pub use di::DI;
+pub use ei::EI;
 pub use invalid::Invalid;
 pub use jp::Jp;
 pub use jr::Jr;

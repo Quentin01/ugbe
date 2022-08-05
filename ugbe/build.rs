@@ -261,11 +261,9 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 // Invalid opcodes
                 format!("&implementation::Invalid::<{opcode}, false>::new()").into()
             } else if y == 6 {
-                // TODO: DI
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::DI::new()".into()
             } else if y == 7 {
-                // TODO: EI
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::EI::new()".into()
             } else {
                 unreachable!("Y > 7")
             }
