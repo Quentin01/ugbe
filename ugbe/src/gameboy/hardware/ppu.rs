@@ -544,28 +544,28 @@ impl Ppu {
 
     pub fn read_vram_byte(&self, address: u16) -> u8 {
         match self.mode {
-            Mode::Drawing { .. } => 0xFF,
+            Mode::Drawing { .. } if self.lcdc.lcd_enabled() => 0xFF,
             _ => self.vram[address as usize],
         }
     }
 
     pub fn write_vram_byte(&mut self, address: u16, value: u8) {
         match self.mode {
-            Mode::Drawing { .. } => {}
+            Mode::Drawing { .. } if self.lcdc.lcd_enabled() => {}
             _ => self.vram[address as usize] = value,
         }
     }
 
     pub fn read_oam_byte(&self, address: u16) -> u8 {
         match self.mode {
-            Mode::OAMScan { .. } | Mode::Drawing { .. } => 0xFF,
+            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => 0xFF,
             _ => self.oam[address as usize],
         }
     }
 
     pub fn write_oam_byte(&mut self, address: u16, value: u8) {
         match self.mode {
-            Mode::OAMScan { .. } | Mode::Drawing { .. } => {}
+            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => {}
             _ => self.oam[address as usize] = value,
         }
     }
