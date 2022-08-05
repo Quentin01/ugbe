@@ -89,14 +89,13 @@ pub enum Mode {
         current_sprite: Option<Sprite>,
         win_ly: u8,
     },
-    // TODO: Add fetchers, fifos
-    // TODO: Add pixel to discard coming from the 3 lower bits of scx
     Drawing {
         sprite_buffer: [Option<Sprite>; 10],
         wy_match_ly: bool,
         scx_delay: u8,
         lx: u8,
         elapsed_cycles: usize,
+        win_fetcher: bool,
         bg_win_fetcher: fetcher::BackgroundWindowFetcher,
         bg_win_fifo: fifo::Fifo<fetcher::BackgroundWindowPixel, 8>,
         win_ly: u8,
@@ -106,7 +105,6 @@ pub enum Mode {
         wy_match_ly: bool,
         win_ly: u8,
     },
-    // TODO: Add data to the modes so that we know what we are currently doing
     VBlank {
         elapsed_cycles_line: usize,
         ly: u8,
@@ -159,11 +157,7 @@ impl Mode {
                         Mode::OAMScan {
                             sprite_buffer,
                             sprite_buffer_idx,
-                            wy_match_ly: if sprite_idx == 0 {
-                                ppu.wy == ppu.ly
-                            } else {
-                                wy_match_ly
-                            },
+                            wy_match_ly: if ppu.wy == ppu.ly { true } else { wy_match_ly },
                             sprite_idx: sprite_idx + 1,
                             current_sprite: Some(sprite),
                             win_ly,
@@ -226,9 +220,10 @@ impl Mode {
                 mut scx_delay,
                 mut lx,
                 mut elapsed_cycles,
+                mut win_fetcher,
                 mut bg_win_fetcher,
                 mut bg_win_fifo,
-                win_ly,
+                mut win_ly,
             } => {
                 elapsed_cycles += 1;
 
@@ -267,13 +262,17 @@ impl Mode {
                 // TODO: If we have a sprite fetcher, use it
 
                 // Check if we need to start fetching the window
-                if ppu.lcdc.display_window() && wy_match_ly && lx == ppu.wx - 7 {
+                if ppu.lcdc.display_window() && wy_match_ly && lx == ppu.wx - 7 && !win_fetcher {
                     bg_win_fetcher = fetcher::BackgroundWindowFetcher::new(
                         ppu.lcdc.window_tile_map(),
                         0,
                         win_ly,
                     );
+
                     bg_win_fifo.clear();
+
+                    win_fetcher = true;
+                    win_ly += 1;
                 }
 
                 bg_win_fetcher.tick(ppu, &mut bg_win_fifo);
@@ -301,6 +300,7 @@ impl Mode {
                         scx_delay,
                         lx,
                         elapsed_cycles,
+                        win_fetcher,
                         bg_win_fetcher,
                         bg_win_fifo,
                         win_ly,
@@ -378,6 +378,7 @@ impl Mode {
             scx_delay: ppu.scx % 8,
             lx: 0,
             elapsed_cycles: 0,
+            win_fetcher: false,
             bg_win_fetcher: fetcher::BackgroundWindowFetcher::new(
                 ppu.lcdc.bg_tile_map(),
                 ppu.scx,
@@ -422,10 +423,10 @@ impl Mode {
         Self::OAMScan {
             sprite_buffer: [None; 10],
             sprite_buffer_idx: 0,
-            wy_match_ly: false,
+            wy_match_ly,
             sprite_idx: 0,
             current_sprite: None,
-            win_ly: if wy_match_ly { win_ly + 1 } else { win_ly },
+            win_ly,
         }
     }
 
@@ -550,9 +551,6 @@ impl Ppu {
                 }
                 None => {}
             }
-
-            // TODO: Do some logic depending on the new LCDC compared to the previous one
-            //       e.g the user turned off the LCD
 
             self.lcdc = value.into();
         }
