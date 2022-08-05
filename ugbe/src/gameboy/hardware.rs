@@ -90,7 +90,14 @@ impl super::mmu::Mmu for Hardware {
             0xFF43 => self.ppu.write_scx(value),
             0xFF44 => {} // We can't write to LY
             0xFF45 => self.ppu.write_lyc(value),
-            0xFF46 => todo!("DMA write"),
+            0xFF46 => {
+                let src = (value as u16) * 0x100;
+
+                // TODO: Properly do the DMA
+                for i in 0..=0x9f {
+                    self.write_byte(0xFE00 + i, self.read_byte(src + i));
+                }
+            }
             0xFF47 => self.ppu.write_bgp(value),
             0xFF48 => self.ppu.write_obp0(value),
             0xFF49 => self.ppu.write_obp1(value),
