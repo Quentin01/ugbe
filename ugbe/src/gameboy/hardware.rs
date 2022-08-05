@@ -2,6 +2,7 @@ pub mod bootrom;
 pub mod cartbridge;
 pub mod interrupt;
 pub mod ppu;
+pub mod wram;
 
 #[derive(Debug)]
 pub struct Hardware {
@@ -10,6 +11,7 @@ pub struct Hardware {
     cartbridge: cartbridge::Cartbridge,
     ppu: ppu::Ppu,
     interrupt: interrupt::Interrupt,
+    work_ram: wram::WorkRam<0x1000>,
     tmp_ram: [u8; 0x10000],
 }
 
@@ -25,6 +27,7 @@ impl Hardware {
             cartbridge,
             ppu: ppu::Ppu::new(renderer),
             interrupt: interrupt::Interrupt::new(),
+            work_ram: wram::WorkRam::new(),
             tmp_ram: [0; 0x10000],
         }
     }
@@ -43,6 +46,8 @@ impl super::mmu::Mmu for Hardware {
             0x4000..=0x7FFF => self.cartbridge.read_rom_bankN(address - 0x4000),
             0x8000..=0x9FFF => self.ppu.read_vram_byte(address - 0x8000),
             0xA000..=0xBFFF => self.cartbridge.read_ram(address - 0xA000),
+            0xC000..=0xCFFF => self.work_ram[address - 0xC000],
+            0xE000..=0xEFFF => self.work_ram[address - 0xE000],
             0xFE00..=0xFE9F => self.ppu.read_oam_byte(address - 0xFE00),
             0xFF0F => self.interrupt.flags(),
             0xFF40 => self.ppu.read_lcdc(),
@@ -82,6 +87,8 @@ impl super::mmu::Mmu for Hardware {
             0x0..=0x7FFF => {}                        // Writing into the cartbridge ROM
             0x8000..=0x9FFF => self.ppu.write_vram_byte(address - 0x8000, value),
             0xA000..=0xBFFF => self.cartbridge.write_ram(address - 0xA000, value),
+            0xC000..=0xCFFF => self.work_ram[address - 0xC000] = value,
+            0xE000..=0xEFFF => self.work_ram[address - 0xE000] = value,
             0xFE00..=0xFE9F => self.ppu.write_oam_byte(address - 0xFE00, value),
             0xFF0F => self.interrupt.set_flags(value),
             0xFF40 => self.ppu.write_lcdc(value),
