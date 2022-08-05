@@ -1,5 +1,6 @@
 pub mod bootrom;
 pub mod cartbridge;
+pub mod interrupt;
 pub mod ppu;
 
 #[derive(Debug)]
@@ -8,6 +9,7 @@ pub struct Hardware {
     boot_rom_enabled: bool,
     cartbridge: cartbridge::Cartbridge,
     ppu: ppu::Ppu,
+    interrupt: interrupt::Interrupt,
     tmp_ram: [u8; 0x10000],
 }
 
@@ -22,13 +24,14 @@ impl Hardware {
             boot_rom_enabled: true,
             cartbridge,
             ppu: ppu::Ppu::new(renderer),
+            interrupt: interrupt::Interrupt::new(),
             tmp_ram: [0; 0x10000],
         }
     }
 
     pub fn tick(&mut self) {
         // TODO: Tick the sub-devices
-        self.ppu.tick()
+        self.ppu.tick(&mut self.interrupt)
     }
 }
 
@@ -41,13 +44,17 @@ impl super::mmu::Mmu for Hardware {
             0x8000..=0x9FFF => self.ppu.read_vram_byte(address - 0x8000),
             0xA000..=0xBFFF => self.cartbridge.read_ram(address - 0xA000),
             0xFE00..=0xFE9F => self.ppu.read_oam_byte(address - 0xFE00),
+            0xFF0F => self.interrupt.flags(),
             0xFF40 => self.ppu.read_lcdc(),
             0xFF41 => self.ppu.read_stat(),
             0xFF42 => self.ppu.read_scy(),
             0xFF43 => self.ppu.read_scx(),
             0xFF44 => self.ppu.read_ly(),
             0xFF45 => self.ppu.read_lyc(),
-            0xFF46 => todo!("DMA read"),
+            0xFF46 => {
+                println!("DMA read");
+                0xFF
+            }
             0xFF47 => self.ppu.read_bgp(),
             0xFF48 => self.ppu.read_obp0(),
             0xFF49 => self.ppu.read_obp1(),
@@ -60,6 +67,7 @@ impl super::mmu::Mmu for Hardware {
                     0xFE
                 }
             }
+            0xFFFF => self.interrupt.enable(),
             // TODO: Handle memory correctly
             _ => {
                 // println!("Warning: Unsupported read at ${:04x}", address);
@@ -75,6 +83,7 @@ impl super::mmu::Mmu for Hardware {
             0x8000..=0x9FFF => self.ppu.write_vram_byte(address - 0x8000, value),
             0xA000..=0xBFFF => self.cartbridge.write_ram(address - 0xA000, value),
             0xFE00..=0xFE9F => self.ppu.write_oam_byte(address - 0xFE00, value),
+            0xFF0F => self.interrupt.set_flags(value),
             0xFF40 => self.ppu.write_lcdc(value),
             0xFF41 => self.ppu.write_stat(value),
             0xFF42 => self.ppu.write_scy(value),
@@ -88,6 +97,7 @@ impl super::mmu::Mmu for Hardware {
             0xFF4A => self.ppu.write_wy(value),
             0xFF4B => self.ppu.write_wx(value),
             0xFF50 => self.boot_rom_enabled = value & 0x1 == 0x0,
+            0xFFFF => self.interrupt.set_enable(value),
             // TODO: Handle memory correctly
             _ => {
                 // println!(
@@ -97,5 +107,19 @@ impl super::mmu::Mmu for Hardware {
                 self.tmp_ram[address as usize] = value
             }
         }
+    }
+}
+
+impl super::interrupt::Line for Hardware {
+    fn highest_priority(&self) -> Option<super::interrupt::Kind> {
+        self.interrupt.highest_priority()
+    }
+
+    fn ack(&mut self, kind: super::interrupt::Kind) {
+        self.interrupt.ack(kind)
+    }
+
+    fn request(&mut self, kind: super::interrupt::Kind) {
+        self.interrupt.request(kind)
     }
 }

@@ -1,5 +1,8 @@
 use std::{fmt::Debug, ops::Index};
 
+use super::super::interrupt::Kind as InterruptKind;
+use super::super::interrupt::Line as InterruptLine;
+
 mod fetcher;
 mod fifo;
 mod registers;
@@ -124,7 +127,7 @@ impl Default for Mode {
 }
 
 impl Mode {
-    fn execute(self, ppu: &mut Ppu) -> Self {
+    fn execute(self, ppu: &mut Ppu, interrupt_line: &mut dyn InterruptLine) -> Self {
         // If the LCD is OFF, we don't have to do anything
         if !ppu.lcdc.lcd_enabled() {
             return self;
@@ -309,12 +312,12 @@ impl Mode {
                 wy_match_ly,
                 win_ly,
             } => {
-                elapsed_cycles = elapsed_cycles + 1;
+                elapsed_cycles += 1;
 
                 // A line is 456 T-cycles but elapsed_cycles started counting after the OAM scan which have a duration of 80 T-cycles
                 if elapsed_cycles >= 456 - 80 {
                     if ppu.ly >= 143 {
-                        Self::switch_from_hblank_to_vblank(ppu)
+                        Self::switch_from_hblank_to_vblank(ppu, interrupt_line)
                     } else {
                         Self::switch_from_hblank_to_oam_scan(ppu, wy_match_ly, win_ly)
                     }
@@ -399,8 +402,12 @@ impl Mode {
         }
     }
 
-    fn switch_from_hblank_to_vblank(ppu: &mut Ppu) -> Mode {
-        // TODO: Interrupts?
+    fn switch_from_hblank_to_vblank(ppu: &mut Ppu, interrupt_line: &mut dyn InterruptLine) -> Mode {
+        interrupt_line.request(InterruptKind::VBlank);
+        if ppu.stat.vblank_interrupt_enabled() {
+            interrupt_line.request(InterruptKind::Stat);
+        }
+
         Mode::VBlank {
             elapsed_cycles_line: 0,
             ly: ppu.ly,
@@ -489,8 +496,8 @@ impl Ppu {
         }
     }
 
-    pub fn tick(&mut self) {
-        self.mode = self.mode.execute(self);
+    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
+        self.mode = self.mode.execute(self, interrupt_line);
     }
 
     pub fn read_vram_byte(&self, address: u16) -> u8 {

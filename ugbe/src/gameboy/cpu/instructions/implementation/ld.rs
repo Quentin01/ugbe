@@ -68,7 +68,7 @@ where
                 match operand_read_value.next(registers, data_bus) {
                     OperandReadExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::ReadingFromSrc(operand_read_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandReadExecutionState::Complete(value) => {
                         let _ =
@@ -81,7 +81,7 @@ where
                 match operand_write_value.next(registers, data_bus) {
                     OperandWriteExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::WritingToDst(operand_write_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandWriteExecutionState::Complete => {
                         let _ = std::mem::replace(self, Self::Complete);

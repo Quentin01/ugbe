@@ -75,7 +75,7 @@ where
                 match operand_read_value.next(registers, data_bus) {
                     OperandReadExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::ReadingOffset(operand_read_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandReadExecutionState::Complete(value) => {
                         if Cond::check(registers) {
@@ -94,7 +94,7 @@ where
                 let _ = std::mem::replace(self, Self::Complete);
 
                 if !WAIT_ONE_EXTRA_CYCLE {
-                    InstructionExecutionState::Yield(MemoryOperation::None)
+                    InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
                 } else {
                     self.next(registers, data_bus)
                 }

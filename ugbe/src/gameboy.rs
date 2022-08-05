@@ -3,6 +3,7 @@ use std::{fs, io, path::Path};
 mod bus;
 mod cpu;
 mod hardware;
+mod interrupt;
 mod mmu;
 
 pub use hardware::ppu::screen;
@@ -65,7 +66,7 @@ impl Gameboy {
         //       In the future, this should be handled by ticking every t-cycle for each
         for _ in 0..t_cycle_count {
             if self.t_cycle_count % 4 == 0 {
-                let memory_operation = self.cpu.tick(&self.bus, &self.hardware, &self.hardware.ppu);
+                let memory_operation = self.cpu.tick(&self.bus, &mut self.hardware);
                 self.bus.tick(memory_operation, &mut self.hardware);
             }
 

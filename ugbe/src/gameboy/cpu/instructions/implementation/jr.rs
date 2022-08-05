@@ -72,7 +72,7 @@ where
                 match operand_read_value.next(registers, data_bus) {
                     OperandReadExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::ReadingOffset(operand_read_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandReadExecutionState::Complete(value) => {
                         if Cond::check(registers) {
@@ -89,7 +89,7 @@ where
                 registers.set_pc(pc.wrapping_add(offset as u16));
 
                 let _ = std::mem::replace(self, Self::Complete);
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
             }
             Self::Complete => InstructionExecutionState::Complete,
         }

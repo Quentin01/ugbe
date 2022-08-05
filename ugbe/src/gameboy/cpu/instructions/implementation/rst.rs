@@ -44,7 +44,7 @@ impl<const ADDRESS: u8> InstructionExecution for RstExecution<ADDRESS> {
                 registers.set_sp(sp.wrapping_sub(1));
 
                 let _ = std::mem::replace(self, Self::PushingMsbPC);
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
             }
             Self::PushingMsbPC => {
                 let sp = registers.sp();
@@ -53,7 +53,10 @@ impl<const ADDRESS: u8> InstructionExecution for RstExecution<ADDRESS> {
                 let [value, _] = registers.pc().to_be_bytes();
 
                 let _ = std::mem::replace(self, Self::PushingLsbPC);
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::PushingLsbPC => {
                 let sp = registers.sp();
@@ -61,7 +64,10 @@ impl<const ADDRESS: u8> InstructionExecution for RstExecution<ADDRESS> {
                 let [_, value] = registers.pc().to_be_bytes();
 
                 let _ = std::mem::replace(self, Self::ChangingPC);
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::ChangingPC => {
                 registers.set_pc(ADDRESS as u16);

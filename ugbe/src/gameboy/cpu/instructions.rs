@@ -53,7 +53,8 @@ pub trait Instruction {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InstructionExecutionState {
-    Yield(MemoryOperation),
+    YieldMemoryOperation(MemoryOperation),
+    YieldCpuOperation(super::CpuOperation),
     Complete,
 }
 

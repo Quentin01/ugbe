@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use crate::gameboy::cpu::MemoryOperation;
+use crate::gameboy::cpu::{CpuOperation, MemoryOperation};
 
 use super::super::super::registers::Registers;
 use super::super::condition::Condition;
@@ -51,6 +51,7 @@ where
     PopingLsbPC,
     PopingMsbPC,
     SettingPC(u8),
+    EnableInterrupt,
     Complete,
 }
 
@@ -77,32 +78,41 @@ where
                     let _ = std::mem::replace(self, Self::Complete);
                 }
 
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
             }
             Self::PopingLsbPC => {
                 let sp = registers.sp();
                 registers.set_sp(sp.wrapping_add(1));
 
                 let _ = std::mem::replace(self, Self::PopingMsbPC);
-                InstructionExecutionState::Yield(MemoryOperation::Read { address: sp })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Read {
+                    address: sp,
+                })
             }
             Self::PopingMsbPC => {
                 let sp = registers.sp();
                 registers.set_sp(sp.wrapping_add(1));
 
                 let _ = std::mem::replace(self, Self::SettingPC(data_bus));
-                InstructionExecutionState::Yield(MemoryOperation::Read { address: sp })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Read {
+                    address: sp,
+                })
             }
             Self::SettingPC(lsb) => {
                 let pc = u16::from_be_bytes([data_bus, lsb]);
                 registers.set_pc(pc);
 
                 if ENABLE_INTERRUPT {
-                    // TODO: Set IME
+                    let _ = std::mem::replace(self, Self::EnableInterrupt);
+                } else {
+                    let _ = std::mem::replace(self, Self::Complete);
                 }
 
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
+            }
+            Self::EnableInterrupt => {
                 let _ = std::mem::replace(self, Self::Complete);
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldCpuOperation(CpuOperation::EnableInterruptNow)
             }
             Self::Complete => InstructionExecutionState::Complete,
         }

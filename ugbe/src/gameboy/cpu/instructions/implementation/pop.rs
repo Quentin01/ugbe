@@ -67,14 +67,18 @@ where
                 registers.set_sp(sp.wrapping_add(1));
 
                 let _ = std::mem::replace(self, Self::PopingMsb);
-                InstructionExecutionState::Yield(MemoryOperation::Read { address: sp })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Read {
+                    address: sp,
+                })
             }
             Self::PopingMsb => {
                 let sp = registers.sp();
                 registers.set_sp(sp.wrapping_add(1));
 
                 let _ = std::mem::replace(self, Self::PoppingEnd(data_bus));
-                InstructionExecutionState::Yield(MemoryOperation::Read { address: sp })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Read {
+                    address: sp,
+                })
             }
             Self::PoppingEnd(lsb) => {
                 let value = u16::from_be_bytes([data_bus, lsb]);
@@ -87,7 +91,7 @@ where
                 match operand_write_value.next(registers, data_bus) {
                     OperandWriteExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::WritingValue(operand_write_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandWriteExecutionState::Complete => {
                         let _ = std::mem::replace(self, Self::Complete);

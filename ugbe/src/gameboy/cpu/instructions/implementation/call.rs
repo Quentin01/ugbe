@@ -75,7 +75,7 @@ where
                 match operand_read_value.next(registers, data_bus) {
                     OperandReadExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::ReadingAddress(operand_read_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandReadExecutionState::Complete(value) => {
                         if Cond::check(registers) {
@@ -93,7 +93,7 @@ where
                 registers.set_sp(sp.wrapping_sub(1));
 
                 let _ = std::mem::replace(self, Self::PushingMsbPC(new_address));
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
             }
             Self::PushingMsbPC(new_address) => {
                 let sp = registers.sp();
@@ -102,7 +102,10 @@ where
                 let [value, _] = registers.pc().to_be_bytes();
 
                 let _ = std::mem::replace(self, Self::PushingLsbPC(new_address));
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::PushingLsbPC(new_address) => {
                 let sp = registers.sp();
@@ -110,7 +113,10 @@ where
                 let [_, value] = registers.pc().to_be_bytes();
 
                 let _ = std::mem::replace(self, Self::ChangingPC(new_address));
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::ChangingPC(new_address) => {
                 registers.set_pc(new_address);

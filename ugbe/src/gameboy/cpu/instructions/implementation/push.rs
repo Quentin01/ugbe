@@ -64,7 +64,7 @@ where
                 match operand_read_value.next(registers, data_bus) {
                     OperandReadExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::ReadingValue(operand_read_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandReadExecutionState::Complete(value) => {
                         let _ = std::mem::replace(self, Self::DecrementingSP(value.to_be_bytes()));
@@ -77,7 +77,7 @@ where
                 registers.set_sp(sp.wrapping_sub(1));
 
                 let _ = std::mem::replace(self, Self::PushingMsb(bytes));
-                InstructionExecutionState::Yield(MemoryOperation::None)
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
             }
             Self::PushingMsb(bytes) => {
                 let sp = registers.sp();
@@ -86,7 +86,10 @@ where
                 let [value, _] = bytes;
 
                 let _ = std::mem::replace(self, Self::PushingLsb(bytes));
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::PushingLsb(bytes) => {
                 let sp = registers.sp();
@@ -94,7 +97,10 @@ where
                 let [_, value] = bytes;
 
                 let _ = std::mem::replace(self, Self::Complete);
-                InstructionExecutionState::Yield(MemoryOperation::Write { address: sp, value })
+                InstructionExecutionState::YieldMemoryOperation(MemoryOperation::Write {
+                    address: sp,
+                    value,
+                })
             }
             Self::Complete => InstructionExecutionState::Complete,
         }

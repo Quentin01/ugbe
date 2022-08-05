@@ -197,7 +197,7 @@ where
                             alu_fn,
                         },
                     );
-                    InstructionExecutionState::Yield(memory_operation)
+                    InstructionExecutionState::YieldMemoryOperation(memory_operation)
                 }
                 OperandReadExecutionState::Complete(value) => {
                     if DST_IS_SRC {
@@ -237,7 +237,7 @@ where
                             src,
                         },
                     );
-                    InstructionExecutionState::Yield(memory_operation)
+                    InstructionExecutionState::YieldMemoryOperation(memory_operation)
                 }
                 OperandReadExecutionState::Complete(value) => {
                     let _ = std::mem::replace(
@@ -283,7 +283,7 @@ where
                 match operand_write_value.next(registers, data_bus) {
                     OperandWriteExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::WritingToDst(operand_write_value));
-                        InstructionExecutionState::Yield(memory_operation)
+                        InstructionExecutionState::YieldMemoryOperation(memory_operation)
                     }
                     OperandWriteExecutionState::Complete => {
                         let _ = std::mem::replace(self, Self::Wait(alu_extra_cycles));
@@ -297,7 +297,7 @@ where
                     self.next(registers, data_bus)
                 } else {
                     let _ = std::mem::replace(self, Self::Wait(cycles - 1));
-                    InstructionExecutionState::Yield(MemoryOperation::None)
+                    InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
                 }
             }
             AluExecution::Complete => InstructionExecutionState::Complete,
