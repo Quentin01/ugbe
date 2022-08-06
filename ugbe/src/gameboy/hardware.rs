@@ -2,6 +2,7 @@ pub mod bootrom;
 pub mod cartbridge;
 pub mod interrupt;
 pub mod ppu;
+pub mod timer;
 pub mod wram;
 
 #[derive(Debug)]
@@ -12,6 +13,7 @@ pub struct Hardware {
     ppu: ppu::Ppu,
     interrupt: interrupt::Interrupt,
     work_ram: wram::WorkRam<0x1000>,
+    timer: timer::Timer,
     tmp_ram: [u8; 0x10000],
 }
 
@@ -28,13 +30,14 @@ impl Hardware {
             ppu: ppu::Ppu::new(renderer),
             interrupt: interrupt::Interrupt::new(),
             work_ram: wram::WorkRam::new(),
+            timer: timer::Timer::new(),
             tmp_ram: [0; 0x10000],
         }
     }
 
     pub fn tick(&mut self) {
-        // TODO: Tick the sub-devices
-        self.ppu.tick(&mut self.interrupt)
+        self.ppu.tick(&mut self.interrupt);
+        self.timer.tick(&mut self.interrupt);
     }
 }
 
@@ -49,6 +52,10 @@ impl super::mmu::Mmu for Hardware {
             0xC000..=0xCFFF => self.work_ram[address - 0xC000],
             0xE000..=0xEFFF => self.work_ram[address - 0xE000],
             0xFE00..=0xFE9F => self.ppu.read_oam_byte(address - 0xFE00),
+            0xFF04 => self.timer.read_div(),
+            0xFF05 => self.timer.read_tima(),
+            0xFF06 => self.timer.read_tma(),
+            0xFF07 => self.timer.read_tac(),
             0xFF0F => self.interrupt.flags(),
             0xFF40 => self.ppu.read_lcdc(),
             0xFF41 => self.ppu.read_stat(),
@@ -90,6 +97,10 @@ impl super::mmu::Mmu for Hardware {
             0xC000..=0xCFFF => self.work_ram[address - 0xC000] = value,
             0xE000..=0xEFFF => self.work_ram[address - 0xE000] = value,
             0xFE00..=0xFE9F => self.ppu.write_oam_byte(address - 0xFE00, value),
+            0xFF04 => self.timer.write_div(value),
+            0xFF05 => self.timer.write_tima(value),
+            0xFF06 => self.timer.write_tma(value),
+            0xFF07 => self.timer.write_tac(value),
             0xFF0F => self.interrupt.set_flags(value),
             0xFF40 => self.ppu.write_lcdc(value),
             0xFF41 => self.ppu.write_stat(value),
