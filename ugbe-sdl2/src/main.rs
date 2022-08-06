@@ -103,6 +103,7 @@ fn main() -> Result<(), io::Error> {
             for y in 0..gameboy::screen::Screen::HEIGHT {
                 let color = pixels[y * gameboy::screen::Screen::WIDTH + x];
                 canvas.set_draw_color(match color {
+                    gameboy::screen::Color::Off => sdl2::pixels::Color::RGB(255, 255, 255),
                     gameboy::screen::Color::White => sdl2::pixels::Color::RGB(255, 255, 255),
                     gameboy::screen::Color::LightGray => sdl2::pixels::Color::RGB(170, 170, 170),
                     gameboy::screen::Color::DarkGray => sdl2::pixels::Color::RGB(85, 85, 85),

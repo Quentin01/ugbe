@@ -354,7 +354,10 @@ impl Mode {
                             bg_pixel.color()
                         };
 
-                        ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
+                        if !ppu.skip_frame {
+                            ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
+                        }
+
                         lx = lx.wrapping_add(1)
                     }
                 }
@@ -506,6 +509,8 @@ impl Mode {
             None => {}
         }
 
+        ppu.skip_frame = false;
+
         ppu.ly += 1;
         ppu.check_lyc_compare(interrupt_line);
 
@@ -551,6 +556,7 @@ impl Mode {
 }
 
 pub struct Ppu {
+    skip_frame: bool,
     lcdc: registers::Lcdc,
     lyc_compare: bool,
     stat: registers::Stat,
@@ -585,6 +591,7 @@ impl Debug for Ppu {
 impl Ppu {
     pub fn new(renderer: Option<Box<dyn screen::Renderer>>) -> Self {
         Self {
+            skip_frame: false,
             lcdc: 0.into(),
             lyc_compare: false,
             stat: 0.into(),
@@ -661,10 +668,12 @@ impl Ppu {
                     if new_lcdc.lcd_enabled() != self.lcdc.lcd_enabled() {
                         if new_lcdc.lcd_enabled() {
                             renderer.on();
+                            self.skip_frame = true;
 
                             self.mode = Mode::default();
                         } else {
                             renderer.off();
+                            self.screen.off();
 
                             self.mode = Mode::HBlank {
                                 elapsed_cycles: 0,
