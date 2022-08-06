@@ -11,11 +11,15 @@ use registers::Registers;
 enum State {
     NotStarted,
     WaitingPrefetchRead(bool),
+    DecodeAndExec(u8, bool),
     ExecutingInstruction(
         &'static dyn instructions::Instruction,
         Box<dyn instructions::InstructionExecution + 'static>,
     ),
-    InterruptDispatch(InterruptDispatchState),
+    StartInterruptDispatch,
+    InterruptDispatching(InterruptDispatchState),
+    AfterHalt,
+    Halted,
 }
 
 enum InterruptDispatchState {
@@ -101,6 +105,7 @@ pub enum CpuOperation {
     EnableInterrupt,
     EnableInterruptNow,
     DisableInterrupt,
+    Halt,
 }
 
 pub struct Cpu {
@@ -135,8 +140,7 @@ impl Cpu {
                 if !*cb_prefixed {
                     let interrupt = interrupt_line.highest_priority();
                     if self.ime && interrupt.is_some() {
-                        self.ime = false;
-                        self.state = State::InterruptDispatch(InterruptDispatchState::Start);
+                        self.state = State::StartInterruptDispatch;
                         return self.tick(bus, interrupt_line);
                     }
                 }
@@ -148,7 +152,11 @@ impl Cpu {
 
                 self.registers.set_pc(self.registers.pc().wrapping_add(1));
 
-                if !*cb_prefixed && bus.data() == 0xCB {
+                self.state = State::DecodeAndExec(bus.data(), *cb_prefixed);
+                self.tick(bus, interrupt_line)
+            }
+            State::DecodeAndExec(opcode, cb_prefixed) => {
+                if !*cb_prefixed && *opcode == 0xCB {
                     return self.prefetch_next(true);
                 }
 
@@ -182,16 +190,47 @@ impl Cpu {
                                 self.enable_ime = false;
                                 self.ime = false;
                             }
+                            CpuOperation::Halt => {
+                                let memory_op = self.prefetch_next(false);
+                                self.state = State::AfterHalt;
+                                return memory_op;
+                            }
                         }
 
                         self.tick(bus, interrupt_line)
                     }
                 }
             }
-            State::InterruptDispatch(interrupt_dispatch_state) => {
+            State::StartInterruptDispatch => {
+                self.ime = false;
+                self.state = State::InterruptDispatching(InterruptDispatchState::Start);
+                self.tick(bus, interrupt_line)
+            }
+            State::InterruptDispatching(interrupt_dispatch_state) => {
                 match interrupt_dispatch_state.next(&mut self.registers, interrupt_line) {
                     InterruptDispatchExecutionState::Yield(memory_op) => memory_op,
                     InterruptDispatchExecutionState::Complete => self.prefetch_next(false),
+                }
+            }
+            State::AfterHalt => {
+                if interrupt_line.highest_priority().is_some() {
+                    if self.ime {
+                        self.state = State::StartInterruptDispatch;
+                        self.tick(bus, interrupt_line)
+                    } else {
+                        self.state = State::DecodeAndExec(bus.data(), false);
+                        self.tick(bus, interrupt_line)
+                    }
+                } else {
+                    self.state = State::Halted;
+                    self.tick(bus, interrupt_line)
+                }
+            }
+            State::Halted => {
+                if interrupt_line.flags_not_empty() {
+                    self.prefetch_next(false)
+                } else {
+                    MemoryOperation::None
                 }
             }
         }

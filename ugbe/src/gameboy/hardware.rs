@@ -136,4 +136,8 @@ impl super::interrupt::Line for Hardware {
     fn request(&mut self, kind: super::interrupt::Kind) {
         self.interrupt.request(kind)
     }
+
+    fn flags_not_empty(&self) -> bool {
+        self.interrupt.flags_not_empty()
+    }
 }

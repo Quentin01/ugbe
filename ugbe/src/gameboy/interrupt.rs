@@ -11,4 +11,5 @@ pub trait Line {
     fn highest_priority(&self) -> Option<Kind>;
     fn ack(&mut self, kind: Kind);
     fn request(&mut self, kind: Kind);
+    fn flags_not_empty(&self) -> bool;
 }

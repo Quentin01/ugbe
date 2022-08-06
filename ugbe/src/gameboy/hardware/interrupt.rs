@@ -55,4 +55,8 @@ impl InterruptLine for Interrupt {
     fn request(&mut self, kind: InterruptKind) {
         self.interrupt_flags |= kind as u8;
     }
+
+    fn flags_not_empty(&self) -> bool {
+        self.interrupt_flags & 0b11111 != 0
+    }
 }

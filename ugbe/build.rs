@@ -183,8 +183,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         }
     } else if x == 1 {
         if z == 6 && y == 6 {
-            // TODO: HALT
-            format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+            "&implementation::Halt::new()".into()
         } else {
             format!(
                 "&implementation::Ld::<{}, {}>::new()",
