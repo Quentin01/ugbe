@@ -45,8 +45,8 @@ impl super::mmu::Mmu for Hardware {
     fn read_byte(&self, address: u16) -> u8 {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => self.boot_rom[address as u8],
-            0x0..=0x3FFF => self.cartbridge.read_rom_bank0(address - 0x0),
-            0x4000..=0x7FFF => self.cartbridge.read_rom_bankN(address - 0x4000),
+            0x0..=0x3FFF => self.cartbridge.read_rom_bank_0(address - 0x0),
+            0x4000..=0x7FFF => self.cartbridge.read_rom_bank_n(address - 0x4000),
             0x8000..=0x9FFF => self.ppu.read_vram_byte(address - 0x8000),
             0xA000..=0xBFFF => self.cartbridge.read_ram(address - 0xA000),
             0xC000..=0xCFFF => self.work_ram[address - 0xC000],
@@ -90,8 +90,8 @@ impl super::mmu::Mmu for Hardware {
 
     fn write_byte(&mut self, address: u16, value: u8) {
         match address {
-            0x0..=0xFF if self.boot_rom_enabled => {} // Writing into the boot ROM
-            0x0..=0x7FFF => {}                        // Writing into the cartbridge ROM
+            0x0..=0xFF if self.boot_rom_enabled => {}
+            0x0..=0x7FFF => self.cartbridge.write_rom(address, value),
             0x8000..=0x9FFF => self.ppu.write_vram_byte(address - 0x8000, value),
             0xA000..=0xBFFF => self.cartbridge.write_ram(address - 0xA000, value),
             0xC000..=0xCFFF => self.work_ram[address - 0xC000] = value,
