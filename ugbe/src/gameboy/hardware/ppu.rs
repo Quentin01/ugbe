@@ -293,23 +293,23 @@ impl Mode {
                 }
 
                 if let Some(fetcher) = &mut sprite_fetcher {
-                    if !fetcher.tick(ppu, lx, &mut sprite_fifo) {
-                        return Mode::Drawing {
-                            sprite_buffer,
-                            wy_match_ly,
-                            scx_delay,
-                            lx,
-                            elapsed_cycles,
-                            win_fetcher,
-                            bg_win_fetcher,
-                            bg_win_fifo,
-                            sprite_fetcher,
-                            sprite_fifo,
-                            win_ly,
-                        };
+                    if fetcher.tick(ppu, lx, &mut sprite_fifo) {
+                        sprite_fetcher = None;
                     }
 
-                    sprite_fetcher = None;
+                    return Mode::Drawing {
+                        sprite_buffer,
+                        wy_match_ly,
+                        scx_delay,
+                        lx,
+                        elapsed_cycles,
+                        win_fetcher,
+                        bg_win_fetcher,
+                        bg_win_fifo,
+                        sprite_fetcher,
+                        sprite_fifo,
+                        win_ly,
+                    };
                 }
 
                 // Check if we need to start fetching the window
