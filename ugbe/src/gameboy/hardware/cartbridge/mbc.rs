@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 mod mbc1;
+mod mbc5;
 mod none;
 
 pub trait Mbc {
@@ -33,5 +34,5 @@ pub fn new_mbc3(ram: bool, battery_buffered_ram: bool, rtc: bool) -> Box<dyn Mbc
 }
 
 pub fn new_mbc5(ram: bool, battery_buffered_ram: bool, rumble: bool) -> Box<dyn Mbc> {
-    todo!("New MBC5");
+    Box::new(mbc5::Mbc::new(ram, battery_buffered_ram, rumble))
 }
