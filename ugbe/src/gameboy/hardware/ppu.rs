@@ -506,6 +506,11 @@ impl Mode {
             interrupt_line.request(InterruptKind::Stat);
         }
 
+        match ppu.renderer.as_mut() {
+            Some(renderer) => renderer.vblank(&ppu.screen),
+            None => {}
+        }
+
         Mode::VBlank {
             elapsed_cycles_line: 0,
             ly: ppu.ly,
@@ -544,11 +549,6 @@ impl Mode {
     ) -> Mode {
         if ppu.stat.oam_scanning_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
-        }
-
-        match ppu.renderer.as_mut() {
-            Some(renderer) => renderer.vblank(&ppu.screen),
-            None => {}
         }
 
         ppu.ly = 0;
@@ -654,10 +654,16 @@ impl Ppu {
                     if new_lcdc.lcd_enabled() != self.lcdc.lcd_enabled() {
                         if new_lcdc.lcd_enabled() {
                             renderer.on();
+
+                            self.mode = Mode::default();
                         } else {
                             renderer.off();
 
-                            self.mode = Mode::default();
+                            self.mode = Mode::HBlank {
+                                elapsed_cycles: 0,
+                                wy_match_ly: false,
+                                win_ly: 0,
+                            };
                             self.ly = 0;
                         }
                     }
@@ -708,6 +714,10 @@ impl Ppu {
 
     pub fn read_ly(&self) -> u8 {
         self.ly
+    }
+
+    pub fn write_ly(&mut self, _: u8) {
+        self.ly = 0
     }
 
     pub fn read_lyc(&self) -> u8 {

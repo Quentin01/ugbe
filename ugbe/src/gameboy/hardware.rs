@@ -106,7 +106,7 @@ impl super::mmu::Mmu for Hardware {
             0xFF41 => self.ppu.write_stat(value),
             0xFF42 => self.ppu.write_scy(value),
             0xFF43 => self.ppu.write_scx(value),
-            0xFF44 => {} // We can't write to LY
+            0xFF44 => self.ppu.write_ly(value),
             0xFF45 => self.ppu.write_lyc(value),
             0xFF46 => {
                 let src = (value as u16) * 0x100;
