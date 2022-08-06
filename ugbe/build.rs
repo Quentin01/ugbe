@@ -224,7 +224,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 } else if p == 2 {
                     "&implementation::Jp::<condition::None, operands::HL, false>::new()".into()
                 } else if p == 3 {
-                    "&implementation::Ld::<operands::SP, operands::HL>::new()".into()
+                    "&implementation::Ld::<operands::SP, operands::HL, true>::new()".into()
                 } else {
                     unreachable!("P > 3")
                 }

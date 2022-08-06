@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use crate::gameboy::bus::MemoryOperation;
+
 use super::super::super::registers::Registers;
 use super::super::operands::{
     Operand, OperandIn, OperandOut, OperandReadExecution, OperandReadExecutionState,
@@ -8,7 +10,7 @@ use super::super::operands::{
 };
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
-pub struct Ld<Dst, Src>
+pub struct Ld<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
@@ -16,7 +18,7 @@ where
     phantom: PhantomData<(Dst, Src)>,
 }
 
-impl<Dst, Src> Ld<Dst, Src>
+impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> Ld<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
     Src: Operand + OperandIn,
     Dst: Operand<Value = <Src as Operand>::Value> + OperandOut,
@@ -28,7 +30,7 @@ where
     }
 }
 
-impl<Dst, Src> Instruction for Ld<Dst, Src>
+impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> Instruction for Ld<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
@@ -38,11 +40,13 @@ where
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
-        Box::new(LdExecution::<Dst, Src>::Start(PhantomData))
+        Box::new(LdExecution::<Dst, Src, WAIT_ONE_EXTRA_CYCLE>::Start(
+            PhantomData,
+        ))
     }
 }
 
-enum LdExecution<Dst, Src>
+enum LdExecution<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
@@ -53,7 +57,8 @@ where
     Complete,
 }
 
-impl<Dst, Src> InstructionExecution for LdExecution<Dst, Src>
+impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> InstructionExecution
+    for LdExecution<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
     Src: Operand + OperandIn + 'static,
     Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
@@ -85,7 +90,12 @@ where
                     }
                     OperandWriteExecutionState::Complete => {
                         let _ = std::mem::replace(self, Self::Complete);
-                        self.next(registers, data_bus)
+
+                        if WAIT_ONE_EXTRA_CYCLE {
+                            InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
+                        } else {
+                            self.next(registers, data_bus)
+                        }
                     }
                 }
             }

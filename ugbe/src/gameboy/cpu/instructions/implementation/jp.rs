@@ -93,7 +93,7 @@ where
 
                 let _ = std::mem::replace(self, Self::Complete);
 
-                if !WAIT_ONE_EXTRA_CYCLE {
+                if WAIT_ONE_EXTRA_CYCLE {
                     InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
                 } else {
                     self.next(registers, data_bus)
