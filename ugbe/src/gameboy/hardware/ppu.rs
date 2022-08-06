@@ -392,7 +392,7 @@ impl Mode {
 
                 // A line is 456 T-cycles but elapsed_cycles started counting after the OAM scan which have a duration of 80 T-cycles
                 if elapsed_cycles >= 456 - 80 {
-                    if ppu.ly >= 143 {
+                    if ppu.ly == 143 {
                         Self::switch_from_hblank_to_vblank(ppu, interrupt_line)
                     } else {
                         Self::switch_from_hblank_to_oam_scan(
@@ -417,17 +417,15 @@ impl Mode {
                 elapsed_cycles_line += 1;
 
                 if elapsed_cycles_line == 456 {
-                    ly += 1;
-                    ppu.ly += 1;
-                    elapsed_cycles_line = 0;
-
-                    if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
-                        interrupt_line.request(InterruptKind::Stat);
-                    }
-
                     if ly == 153 {
                         Self::switch_from_vblank_to_oam_scan(ppu, interrupt_line)
                     } else {
+                        ly += 1;
+                        elapsed_cycles_line = 0;
+
+                        ppu.ly += 1;
+                        ppu.check_lyc_compare(interrupt_line);
+
                         Mode::VBlank {
                             elapsed_cycles_line,
                             ly,
@@ -437,10 +435,7 @@ impl Mode {
                     if elapsed_cycles_line == 4 && ly == 153 {
                         // Simulate that the VBlank change LY to 0 after 4 T-cycles in the line 153
                         ppu.ly = 0;
-
-                        if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
-                            interrupt_line.request(InterruptKind::Stat);
-                        }
+                        ppu.check_lyc_compare(interrupt_line);
                     }
 
                     Mode::VBlank {
@@ -511,6 +506,9 @@ impl Mode {
             None => {}
         }
 
+        ppu.ly += 1;
+        ppu.check_lyc_compare(interrupt_line);
+
         Mode::VBlank {
             elapsed_cycles_line: 0,
             ly: ppu.ly,
@@ -528,10 +526,7 @@ impl Mode {
         }
 
         ppu.ly += 1;
-
-        if ppu.stat.lyc_interrupt_enabled() && ppu.ly == ppu.lyc {
-            interrupt_line.request(InterruptKind::Stat);
-        }
+        ppu.check_lyc_compare(interrupt_line);
 
         Self::OAMScan {
             sprite_buffer: [None; 10],
@@ -551,14 +546,13 @@ impl Mode {
             interrupt_line.request(InterruptKind::Stat);
         }
 
-        ppu.ly = 0;
-
         Self::default()
     }
 }
 
 pub struct Ppu {
     lcdc: registers::Lcdc,
+    lyc_compare: bool,
     stat: registers::Stat,
     scy: u8,
     scx: u8,
@@ -592,6 +586,7 @@ impl Ppu {
     pub fn new(renderer: Option<Box<dyn screen::Renderer>>) -> Self {
         Self {
             lcdc: 0.into(),
+            lyc_compare: false,
             stat: 0.into(),
             scy: 0,
             scx: 0,
@@ -612,6 +607,18 @@ impl Ppu {
 
     pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
         self.mode = self.mode.execute(self, interrupt_line);
+    }
+
+    pub fn check_lyc_compare(&mut self, interrupt_line: &mut dyn InterruptLine) {
+        if self.ly != self.lyc {
+            self.lyc_compare = false;
+        } else {
+            self.lyc_compare = true;
+
+            if self.stat.lyc_interrupt_enabled() {
+                interrupt_line.request(InterruptKind::Stat);
+            }
+        }
     }
 
     pub fn read_vram_byte(&self, address: u16) -> u8 {
@@ -664,7 +671,9 @@ impl Ppu {
                                 wy_match_ly: false,
                                 win_ly: 0,
                             };
+
                             self.ly = 0;
+                            self.lyc_compare = true;
                         }
                     }
                 }
@@ -683,7 +692,7 @@ impl Ppu {
             Mode::Drawing { .. } => 0b11,
         };
 
-        let coincidence_flag = if self.ly == self.lyc { 0b100 } else { 0b000 };
+        let coincidence_flag = if self.lyc_compare { 0b100 } else { 0b000 };
 
         mode_bits | coincidence_flag | u8::from(self.stat) | 0b10000000
     }
