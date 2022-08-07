@@ -229,9 +229,16 @@ impl Mode {
 
                         let sprite_height = ppu.lcdc.sprite_height();
 
-                        if (current_sprite.y..(current_sprite.y + sprite_height))
-                            .contains(&(ppu.ly + 16))
-                        {
+                        let sprite_y_range_on_screen = if current_sprite.y >= 16 {
+                            let sprite_y_on_screen = current_sprite.y - 16;
+                            sprite_y_on_screen..(sprite_y_on_screen + sprite_height)
+                        } else if sprite_height + current_sprite.y > 16 {
+                            0..(sprite_height + current_sprite.y - 16)
+                        } else {
+                            0..0
+                        };
+
+                        if sprite_y_range_on_screen.contains(&ppu.ly) {
                             sprite_buffer[sprite_buffer_idx] = Some(current_sprite);
                             sprite_buffer_idx += 1;
                         }
@@ -289,7 +296,16 @@ impl Mode {
                         for sprite_opt in sprite_buffer.iter_mut() {
                             match sprite_opt {
                                 Some(sprite) => {
-                                    if sprite.x <= lx + 8 {
+                                    let sprite_x_range_on_screen = if sprite.x >= 8 {
+                                        let sprite_x_on_screen = sprite.x - 8;
+                                        sprite_x_on_screen..(sprite_x_on_screen + 8)
+                                    } else if sprite.x + 8 > 8 {
+                                        0..sprite.x
+                                    } else {
+                                        0..0
+                                    };
+
+                                    if sprite_x_range_on_screen.contains(&lx) {
                                         break 'fetch_sprite_to_render sprite_opt.take();
                                     }
                                 }
@@ -338,8 +354,7 @@ impl Mode {
                 if ppu.lcdc.display_window() && wy_match_ly && lx == ppu.wx - 7 && !win_fetcher {
                     bg_win_fetcher = fetcher::BackgroundWindowFetcher::new(
                         ppu.lcdc.window_tile_map(),
-                        0,
-                        win_ly,
+                        tiling::PixelPosition::new(0, win_ly as usize),
                     );
 
                     bg_win_fifo.clear();
@@ -513,8 +528,7 @@ impl Mode {
             win_fetcher: false,
             bg_win_fetcher: fetcher::BackgroundWindowFetcher::new(
                 ppu.lcdc.bg_tile_map(),
-                ppu.scx,
-                ppu.ly.wrapping_add(ppu.scy),
+                tiling::PixelPosition::new(ppu.scx as usize, ppu.ly as usize + ppu.scy as usize),
             ),
             bg_win_fifo: fifo::Fifo::new(),
             sprite_fetcher: None,

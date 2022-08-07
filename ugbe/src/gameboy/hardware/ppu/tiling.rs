@@ -14,9 +14,71 @@ impl From<TileNo> for u8 {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct PixelPosition {
+    x: u8,
+    y: u8,
+}
+
+impl PixelPosition {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            x: (x % (TileMap::WIDTH * 8)) as u8,
+            y: (y % (TileMap::HEIGHT * 8)) as u8,
+        }
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn set_x(&mut self, x: usize) {
+        self.x = (x % (TileMap::WIDTH * 8)) as u8
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn set_y(&mut self, y: usize) {
+        self.y = (y % (TileMap::HEIGHT * 8)) as u8
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct TilePosition {
-    pub x: u8,
-    pub y: u8,
+    x: u8,
+    y: u8,
+}
+
+impl From<PixelPosition> for TilePosition {
+    fn from(position: PixelPosition) -> Self {
+        Self::new(position.x() as usize / 8, position.y() as usize / 8)
+    }
+}
+
+impl TilePosition {
+    pub fn new(x: usize, y: usize) -> Self {
+        Self {
+            x: (x % TileMap::WIDTH) as u8,
+            y: (y % TileMap::HEIGHT) as u8,
+        }
+    }
+
+    pub fn x(&self) -> u8 {
+        self.x
+    }
+
+    pub fn set_x(&mut self, x: usize) {
+        self.x = (x % TileMap::WIDTH) as u8
+    }
+
+    pub fn y(&self) -> u8 {
+        self.y
+    }
+
+    pub fn set_y(&mut self, y: usize) {
+        self.y = (y % TileMap::HEIGHT) as u8
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
