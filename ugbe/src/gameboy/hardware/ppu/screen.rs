@@ -58,13 +58,8 @@ impl Screen {
     }
 }
 
-pub trait Renderer {
-    /// Called when the LCD screen is switch to on
-    fn on(&mut self);
-
-    /// Called when the LCD screen is switch to off
-    fn off(&mut self);
-
-    /// Called after the rendering of a frame
-    fn vblank(&mut self, screen: &Screen);
+pub enum Event {
+    VBlank,
+    LCDOn,
+    LCDOff,
 }

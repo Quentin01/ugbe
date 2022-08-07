@@ -1,52 +1,10 @@
 extern crate sdl2;
 
-use std::{cell::RefCell, io, rc::Rc};
+use std::io;
 
 use ugbe::gameboy;
 
-struct RendererData {
-    vblank: bool,
-    pixels:
-        [gameboy::screen::Color; gameboy::screen::Screen::WIDTH * gameboy::screen::Screen::HEIGHT],
-}
-
-struct Renderer<'a> {
-    data: &'a Rc<RefCell<RendererData>>,
-}
-
-impl<'a> gameboy::screen::Renderer for Renderer<'a> {
-    fn on(&mut self) {
-        println!("LCD is on");
-    }
-
-    fn off(&mut self) {
-        println!("LCD is off");
-    }
-
-    fn vblank(&mut self, screen: &gameboy::screen::Screen) {
-        self.data.borrow_mut().vblank = true;
-
-        let pixels = &mut self.data.borrow_mut().pixels;
-        for (i, color) in screen.pixels().iter().enumerate() {
-            pixels[i] = *color;
-        }
-    }
-}
-
-impl<'a> Renderer<'a> {
-    pub fn new(data: &'a Rc<RefCell<RendererData>>) -> Self {
-        Self { data }
-    }
-}
-
 fn main() -> Result<(), io::Error> {
-    let renderer_data: &'static Rc<RefCell<RendererData>> =
-        Box::leak(Box::new(Rc::new(RefCell::new(RendererData {
-            vblank: false,
-            pixels: [gameboy::screen::Color::White;
-                gameboy::screen::Screen::WIDTH * gameboy::screen::Screen::HEIGHT],
-        }))));
-
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -90,15 +48,20 @@ fn main() -> Result<(), io::Error> {
         }
 
         let before_run = std::time::Instant::now();
-        while !renderer_data.borrow().vblank {
-            gameboy.run(1);
+        loop {
+            match gameboy.tick() {
+                Some(screen_event) => match screen_event {
+                    gameboy::screen::Event::VBlank => break,
+                    gameboy::screen::Event::LCDOn => println!("LCD ON"),
+                    gameboy::screen::Event::LCDOff => println!("LCD OFF"),
+                },
+                None => {}
+            }
         }
         let duration_run = before_run.elapsed();
 
-        renderer_data.borrow_mut().vblank = false;
-
         let before_render = std::time::Instant::now();
-        let pixels = renderer_data.borrow().pixels;
+        let pixels = gameboy.screen().pixels();
         for x in 0..gameboy::screen::Screen::WIDTH {
             for y in 0..gameboy::screen::Screen::HEIGHT {
                 let color = pixels[y * gameboy::screen::Screen::WIDTH + x];

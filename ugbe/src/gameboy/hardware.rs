@@ -18,16 +18,12 @@ pub struct Hardware {
 }
 
 impl Hardware {
-    pub fn new(
-        boot_rom: bootrom::BootRom,
-        cartbridge: cartbridge::Cartbridge,
-        renderer: Option<Box<dyn ppu::screen::Renderer>>,
-    ) -> Self {
+    pub fn new(boot_rom: bootrom::BootRom, cartbridge: cartbridge::Cartbridge) -> Self {
         Self {
             boot_rom,
             boot_rom_enabled: true,
             cartbridge,
-            ppu: ppu::Ppu::new(renderer),
+            ppu: ppu::Ppu::new(),
             interrupt: interrupt::Interrupt::new(),
             work_ram: wram::WorkRam::new(),
             timer: timer::Timer::new(),
@@ -35,9 +31,14 @@ impl Hardware {
         }
     }
 
-    pub fn tick(&mut self) {
-        self.ppu.tick(&mut self.interrupt);
+    pub fn tick(&mut self) -> Option<ppu::screen::Event> {
+        let screen_event = self.ppu.tick(&mut self.interrupt);
         self.timer.tick(&mut self.interrupt);
+        screen_event
+    }
+
+    pub fn screen(&self) -> &ppu::screen::Screen {
+        self.ppu.screen()
     }
 }
 

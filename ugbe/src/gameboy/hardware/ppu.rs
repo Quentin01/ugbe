@@ -154,10 +154,14 @@ impl Default for Mode {
 }
 
 impl Mode {
-    fn execute(self, ppu: &mut Ppu, interrupt_line: &mut dyn InterruptLine) -> Self {
+    fn execute(
+        self,
+        ppu: &mut Ppu,
+        interrupt_line: &mut dyn InterruptLine,
+    ) -> (Self, Option<screen::Event>) {
         // If the LCD is OFF, we don't have to do anything
         if !ppu.lcdc.lcd_enabled() {
-            return self;
+            return (self, None);
         }
 
         match self {
@@ -183,34 +187,43 @@ impl Mode {
                             attr: ppu.oam[idx_in_oam + 3],
                         };
 
-                        Mode::OAMScan {
-                            sprite_buffer,
-                            sprite_buffer_idx,
-                            wy_match_ly: if ppu.wy == ppu.ly { true } else { wy_match_ly },
-                            sprite_idx: sprite_idx + 1,
-                            current_sprite: Some(sprite),
-                            win_ly,
-                        }
+                        (
+                            Mode::OAMScan {
+                                sprite_buffer,
+                                sprite_buffer_idx,
+                                wy_match_ly: if ppu.wy == ppu.ly { true } else { wy_match_ly },
+                                sprite_idx: sprite_idx + 1,
+                                current_sprite: Some(sprite),
+                                win_ly,
+                            },
+                            None,
+                        )
                     }
                     Some(current_sprite) => {
                         // During odd T-cycles we are checking if the sprite should be added to the sprite buffer
                         if sprite_buffer_idx >= 10 {
                             if sprite_idx >= 40 {
-                                return Mode::switch_from_oam_scan_to_drawing(
-                                    ppu,
-                                    sprite_buffer,
-                                    wy_match_ly,
-                                    win_ly,
+                                return (
+                                    Mode::switch_from_oam_scan_to_drawing(
+                                        ppu,
+                                        sprite_buffer,
+                                        wy_match_ly,
+                                        win_ly,
+                                    ),
+                                    None,
                                 );
                             } else {
-                                return Mode::OAMScan {
-                                    sprite_buffer,
-                                    sprite_buffer_idx,
-                                    wy_match_ly,
-                                    sprite_idx,
-                                    current_sprite: None,
-                                    win_ly,
-                                };
+                                return (
+                                    Mode::OAMScan {
+                                        sprite_buffer,
+                                        sprite_buffer_idx,
+                                        wy_match_ly,
+                                        sprite_idx,
+                                        current_sprite: None,
+                                        win_ly,
+                                    },
+                                    None,
+                                );
                             }
                         }
 
@@ -224,21 +237,27 @@ impl Mode {
                         }
 
                         if sprite_idx >= 40 {
-                            Mode::switch_from_oam_scan_to_drawing(
-                                ppu,
-                                sprite_buffer,
-                                wy_match_ly,
-                                win_ly,
+                            (
+                                Mode::switch_from_oam_scan_to_drawing(
+                                    ppu,
+                                    sprite_buffer,
+                                    wy_match_ly,
+                                    win_ly,
+                                ),
+                                None,
                             )
                         } else {
-                            Mode::OAMScan {
-                                sprite_buffer,
-                                sprite_buffer_idx,
-                                wy_match_ly,
-                                sprite_idx,
-                                current_sprite: None,
-                                win_ly,
-                            }
+                            (
+                                Mode::OAMScan {
+                                    sprite_buffer,
+                                    sprite_buffer_idx,
+                                    wy_match_ly,
+                                    sprite_idx,
+                                    current_sprite: None,
+                                    win_ly,
+                                },
+                                None,
+                            )
                         }
                     }
                 }
@@ -297,19 +316,22 @@ impl Mode {
                         sprite_fetcher = None;
                     }
 
-                    return Mode::Drawing {
-                        sprite_buffer,
-                        wy_match_ly,
-                        scx_delay,
-                        lx,
-                        elapsed_cycles,
-                        win_fetcher,
-                        bg_win_fetcher,
-                        bg_win_fifo,
-                        sprite_fetcher,
-                        sprite_fifo,
-                        win_ly,
-                    };
+                    return (
+                        Mode::Drawing {
+                            sprite_buffer,
+                            wy_match_ly,
+                            scx_delay,
+                            lx,
+                            elapsed_cycles,
+                            win_fetcher,
+                            bg_win_fetcher,
+                            bg_win_fifo,
+                            sprite_fetcher,
+                            sprite_fifo,
+                            win_ly,
+                        },
+                        None,
+                    );
                 }
 
                 // Check if we need to start fetching the window
@@ -363,27 +385,33 @@ impl Mode {
                 }
 
                 if lx >= 160 {
-                    Mode::switch_from_drawing_to_hblank(
-                        ppu,
-                        interrupt_line,
-                        elapsed_cycles,
-                        wy_match_ly,
-                        win_ly,
+                    (
+                        Mode::switch_from_drawing_to_hblank(
+                            ppu,
+                            interrupt_line,
+                            elapsed_cycles,
+                            wy_match_ly,
+                            win_ly,
+                        ),
+                        None,
                     )
                 } else {
-                    Mode::Drawing {
-                        sprite_buffer,
-                        wy_match_ly,
-                        scx_delay,
-                        lx,
-                        elapsed_cycles,
-                        win_fetcher,
-                        bg_win_fetcher,
-                        bg_win_fifo,
-                        sprite_fetcher,
-                        sprite_fifo,
-                        win_ly,
-                    }
+                    (
+                        Mode::Drawing {
+                            sprite_buffer,
+                            wy_match_ly,
+                            scx_delay,
+                            lx,
+                            elapsed_cycles,
+                            win_fetcher,
+                            bg_win_fetcher,
+                            bg_win_fifo,
+                            sprite_fetcher,
+                            sprite_fifo,
+                            win_ly,
+                        },
+                        None,
+                    )
                 }
             }
             Mode::HBlank {
@@ -396,21 +424,30 @@ impl Mode {
                 // A line is 456 T-cycles but elapsed_cycles started counting after the OAM scan which have a duration of 80 T-cycles
                 if elapsed_cycles >= 456 - 80 {
                     if ppu.ly == 143 {
-                        Self::switch_from_hblank_to_vblank(ppu, interrupt_line)
+                        (
+                            Self::switch_from_hblank_to_vblank(ppu, interrupt_line),
+                            Some(screen::Event::VBlank),
+                        )
                     } else {
-                        Self::switch_from_hblank_to_oam_scan(
-                            ppu,
-                            interrupt_line,
-                            wy_match_ly,
-                            win_ly,
+                        (
+                            Self::switch_from_hblank_to_oam_scan(
+                                ppu,
+                                interrupt_line,
+                                wy_match_ly,
+                                win_ly,
+                            ),
+                            None,
                         )
                     }
                 } else {
-                    Mode::HBlank {
-                        elapsed_cycles,
-                        wy_match_ly,
-                        win_ly,
-                    }
+                    (
+                        Mode::HBlank {
+                            elapsed_cycles,
+                            wy_match_ly,
+                            win_ly,
+                        },
+                        None,
+                    )
                 }
             }
             Mode::VBlank {
@@ -421,7 +458,10 @@ impl Mode {
 
                 if elapsed_cycles_line == 456 {
                     if ly == 153 {
-                        Self::switch_from_vblank_to_oam_scan(ppu, interrupt_line)
+                        (
+                            Self::switch_from_vblank_to_oam_scan(ppu, interrupt_line),
+                            None,
+                        )
                     } else {
                         ly += 1;
                         elapsed_cycles_line = 0;
@@ -429,10 +469,13 @@ impl Mode {
                         ppu.ly += 1;
                         ppu.check_lyc_compare(interrupt_line);
 
-                        Mode::VBlank {
-                            elapsed_cycles_line,
-                            ly,
-                        }
+                        (
+                            Mode::VBlank {
+                                elapsed_cycles_line,
+                                ly,
+                            },
+                            None,
+                        )
                     }
                 } else {
                     if elapsed_cycles_line == 4 && ly == 153 {
@@ -441,10 +484,13 @@ impl Mode {
                         ppu.check_lyc_compare(interrupt_line);
                     }
 
-                    Mode::VBlank {
-                        elapsed_cycles_line,
-                        ly,
-                    }
+                    (
+                        Mode::VBlank {
+                            elapsed_cycles_line,
+                            ly,
+                        },
+                        None,
+                    )
                 }
             }
         }
@@ -502,11 +548,6 @@ impl Mode {
         }
         if ppu.stat.oam_scanning_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
-        }
-
-        match ppu.renderer.as_mut() {
-            Some(renderer) => renderer.vblank(&ppu.screen),
-            None => {}
         }
 
         ppu.skip_frame = false;
@@ -573,7 +614,7 @@ pub struct Ppu {
     vram: [u8; 0x2000],
     oam: [u8; 0x100],
     screen: screen::Screen,
-    renderer: Option<Box<dyn screen::Renderer>>,
+    ldc_event: Option<screen::Event>,
 }
 
 impl Debug for Ppu {
@@ -589,7 +630,7 @@ impl Debug for Ppu {
 }
 
 impl Ppu {
-    pub fn new(renderer: Option<Box<dyn screen::Renderer>>) -> Self {
+    pub fn new() -> Self {
         Self {
             skip_frame: false,
             lcdc: 0.into(),
@@ -608,12 +649,15 @@ impl Ppu {
             vram: [0x0; 0x2000],
             oam: [0x0; 0x100],
             screen: screen::Screen::default(),
-            renderer,
+            ldc_event: None,
         }
     }
 
-    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
-        self.mode = self.mode.execute(self, interrupt_line);
+    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) -> Option<screen::Event> {
+        let (new_mode, screen_event) = self.mode.execute(self, interrupt_line);
+        self.mode = new_mode;
+        let lcd_event = self.ldc_event.take();
+        screen_event.or(lcd_event)
     }
 
     pub fn check_lyc_compare(&mut self, interrupt_line: &mut dyn InterruptLine) {
@@ -663,30 +707,25 @@ impl Ppu {
     pub fn write_lcdc(&mut self, value: u8) {
         let new_lcdc: registers::Lcdc = value.into();
         if new_lcdc != self.lcdc {
-            match self.renderer.as_mut() {
-                Some(renderer) => {
-                    if new_lcdc.lcd_enabled() != self.lcdc.lcd_enabled() {
-                        if new_lcdc.lcd_enabled() {
-                            renderer.on();
-                            self.skip_frame = true;
+            if new_lcdc.lcd_enabled() != self.lcdc.lcd_enabled() {
+                if new_lcdc.lcd_enabled() {
+                    self.ldc_event = Some(screen::Event::LCDOn);
+                    self.skip_frame = true;
 
-                            self.mode = Mode::default();
-                        } else {
-                            renderer.off();
-                            self.screen.off();
+                    self.mode = Mode::default();
+                } else {
+                    self.ldc_event = Some(screen::Event::LCDOff);
+                    self.screen.off();
 
-                            self.mode = Mode::HBlank {
-                                elapsed_cycles: 0,
-                                wy_match_ly: false,
-                                win_ly: 0,
-                            };
+                    self.mode = Mode::HBlank {
+                        elapsed_cycles: 0,
+                        wy_match_ly: false,
+                        win_ly: 0,
+                    };
 
-                            self.ly = 0;
-                            self.lyc_compare = true;
-                        }
-                    }
+                    self.ly = 0;
+                    self.lyc_compare = true;
                 }
-                None => {}
             }
 
             self.lcdc = value.into();
@@ -783,5 +822,9 @@ impl Ppu {
 
     pub fn write_wx(&mut self, value: u8) {
         self.wx = value
+    }
+
+    pub fn screen(&self) -> &screen::Screen {
+        &self.screen
     }
 }

@@ -11,7 +11,6 @@ pub use hardware::ppu::screen;
 pub struct GameboyBuilder {
     boot_rom: hardware::bootrom::BootRom,
     cartbridge: hardware::cartbridge::Cartbridge,
-    renderer: Option<Box<dyn screen::Renderer>>,
 }
 
 impl GameboyBuilder {
@@ -34,19 +33,13 @@ impl GameboyBuilder {
         Ok(Self {
             boot_rom: boot_rom_buffer.into(),
             cartbridge: rom_buffer.into(),
-            renderer: None,
         })
-    }
-
-    pub fn add_renderer(mut self, renderer: Box<dyn screen::Renderer>) -> Self {
-        self.renderer = Some(renderer);
-        self
     }
 
     pub fn build(self) -> Gameboy {
         Gameboy {
             cpu: cpu::Cpu::new(),
-            hardware: hardware::Hardware::new(self.boot_rom, self.cartbridge, self.renderer),
+            hardware: hardware::Hardware::new(self.boot_rom, self.cartbridge),
             bus: bus::Bus::new(),
             t_cycle_count: 0,
         }
@@ -61,18 +54,22 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn run(&mut self, t_cycle_count: usize) {
+    pub fn tick(&mut self) -> Option<screen::Event> {
         // TODO: Currently the CPU is ticking every m-cycle and the hardware needs it every t-cycle
         //       In the future, this should be handled by ticking every t-cycle for each
-        for _ in 0..t_cycle_count {
-            if self.t_cycle_count % 4 == 0 {
-                let memory_operation = self.cpu.tick(&self.bus, &mut self.hardware);
-                self.bus.tick(memory_operation, &mut self.hardware);
-            }
-
-            self.hardware.tick();
-
-            self.t_cycle_count = self.t_cycle_count.wrapping_add(1)
+        if self.t_cycle_count % 4 == 0 {
+            let memory_operation = self.cpu.tick(&self.bus, &mut self.hardware);
+            self.bus.tick(memory_operation, &mut self.hardware);
         }
+
+        let screen_event = self.hardware.tick();
+
+        self.t_cycle_count = self.t_cycle_count.wrapping_add(1);
+
+        screen_event
+    }
+
+    pub fn screen(&self) -> &screen::Screen {
+        self.hardware.screen()
     }
 }
