@@ -4,32 +4,32 @@ mod alu;
 mod condition;
 mod operands;
 
-use super::super::mmu::Mmu;
+use super::super::components::{Mmu, MmuContext};
 use super::registers::Registers;
 use super::MemoryOperation;
 
 pub trait Instruction {
     fn raw_desc(&self) -> Cow<'static, str>;
 
-    fn desc(&self, pc: u16, mmu: &dyn Mmu) -> Cow<'static, str> {
+    fn desc(&self, pc: u16, mmu: &dyn Mmu, mmu_ctx: &MmuContext) -> Cow<'static, str> {
         let raw_desc = self.raw_desc();
 
         if raw_desc.contains("u8") {
             str::replace(
                 &raw_desc,
                 "u8",
-                &format!("${:02x}", mmu.read_byte(pc.wrapping_add(1))),
+                &format!("${:02x}", mmu.read_byte(mmu_ctx, pc.wrapping_add(1))),
             )
             .into()
         } else if raw_desc.contains("u16") {
             str::replace(
                 &raw_desc,
                 "u16",
-                &format!("${:04x}", mmu.read_word(pc.wrapping_add(1))),
+                &format!("${:04x}", mmu.read_word(mmu_ctx, pc.wrapping_add(1))),
             )
             .into()
         } else if raw_desc.contains("i8") {
-            let offset = mmu.read_byte(pc.wrapping_add(1));
+            let offset = mmu.read_byte(mmu_ctx, pc.wrapping_add(1));
             let dst_pc = (pc.wrapping_add(2)) as i32 + ((offset as i8) as i32);
 
             str::replace(
@@ -38,7 +38,7 @@ pub trait Instruction {
                 // TODO: Display as a signed hexadecimal integer
                 &format!(
                     "${:02x} (=> ${:04x})",
-                    mmu.read_byte(pc.wrapping_add(1)),
+                    mmu.read_byte(mmu_ctx, pc.wrapping_add(1)),
                     dst_pc
                 ),
             )

@@ -1,5 +1,4 @@
-use super::super::interrupt::Kind as InterruptKind;
-use super::super::interrupt::Line as InterruptLine;
+use super::components::{InterruptKind, InterruptLine};
 
 #[derive(Debug)]
 struct TAC(u8);

@@ -1,7 +1,6 @@
 use std::{fmt::Debug, ops::Index};
 
-use super::super::interrupt::Kind as InterruptKind;
-use super::super::interrupt::Line as InterruptLine;
+use super::components::{InterruptKind, InterruptLine};
 
 mod fetcher;
 mod fifo;

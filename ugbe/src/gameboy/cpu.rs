@@ -1,6 +1,6 @@
 use super::{
     bus::{Bus, MemoryOperation},
-    interrupt::Line as InterruptLine,
+    components::{InterruptKind, InterruptLine},
 };
 
 mod instructions;
@@ -82,11 +82,11 @@ impl InterruptDispatchState {
                 if let Some(interrupt_kind) = interrupt {
                     interrupt_line.ack(interrupt_kind);
                     registers.set_pc(match interrupt_kind {
-                        super::interrupt::Kind::VBlank => 0x40,
-                        super::interrupt::Kind::Stat => 0x48,
-                        super::interrupt::Kind::Timer => 0x50,
-                        super::interrupt::Kind::Serial => 0x58,
-                        super::interrupt::Kind::Joypad => 0x60,
+                        InterruptKind::VBlank => 0x40,
+                        InterruptKind::Stat => 0x48,
+                        InterruptKind::Timer => 0x50,
+                        InterruptKind::Serial => 0x58,
+                        InterruptKind::Joypad => 0x60,
                     })
                 } else {
                     registers.set_pc(0)

@@ -1,16 +1,21 @@
 use std::{fs, io, path::Path};
 
+mod bootrom;
 mod bus;
+mod cartbridge;
+mod components;
 mod cpu;
-mod hardware;
 mod interrupt;
 mod mmu;
+mod ppu;
+mod timer;
+mod wram;
 
-pub use hardware::ppu::screen;
+pub use ppu::screen;
 
 pub struct GameboyBuilder {
-    boot_rom: hardware::bootrom::BootRom,
-    cartbridge: hardware::cartbridge::Cartbridge,
+    boot_rom: bootrom::BootRom,
+    cartbridge: cartbridge::Cartbridge,
 }
 
 impl GameboyBuilder {
@@ -38,18 +43,30 @@ impl GameboyBuilder {
 
     pub fn build(self) -> Gameboy {
         Gameboy {
+            mmu: mmu::Mmu::new(),
+            boot_rom: self.boot_rom,
+            cartbridge: self.cartbridge,
+            ppu: ppu::Ppu::new(),
             cpu: cpu::Cpu::new(),
-            hardware: hardware::Hardware::new(self.boot_rom, self.cartbridge),
             bus: bus::Bus::new(),
+            interrupt: interrupt::Interrupt::new(),
+            work_ram: wram::WorkRam::new(),
+            timer: timer::Timer::new(),
             t_cycle_count: 0,
         }
     }
 }
 
 pub struct Gameboy {
+    mmu: mmu::Mmu,
+    boot_rom: bootrom::BootRom,
+    cartbridge: cartbridge::Cartbridge,
+    ppu: ppu::Ppu,
     cpu: cpu::Cpu,
-    hardware: hardware::Hardware,
     bus: bus::Bus,
+    interrupt: interrupt::Interrupt,
+    work_ram: wram::WorkRam<0x1000>,
+    timer: timer::Timer,
     t_cycle_count: usize,
 }
 
@@ -58,11 +75,23 @@ impl Gameboy {
         // TODO: Currently the CPU is ticking every m-cycle and the hardware needs it every t-cycle
         //       In the future, this should be handled by ticking every t-cycle for each
         if self.t_cycle_count % 4 == 0 {
-            let memory_operation = self.cpu.tick(&self.bus, &mut self.hardware);
-            self.bus.tick(memory_operation, &mut self.hardware);
+            let memory_operation = self.cpu.tick(&self.bus, &mut self.interrupt);
+            self.bus.tick(
+                memory_operation,
+                &mut self.mmu,
+                &mut components::MmuContext {
+                    ppu: &mut self.ppu,
+                    timer: &mut self.timer,
+                    interrupt: &mut self.interrupt,
+                    boot_rom: &mut self.boot_rom,
+                    cartbridge: &mut self.cartbridge,
+                    work_ram: &mut self.work_ram,
+                },
+            );
         }
 
-        let screen_event = self.hardware.tick();
+        let screen_event = self.ppu.tick(&mut self.interrupt);
+        self.timer.tick(&mut self.interrupt);
 
         self.t_cycle_count = self.t_cycle_count.wrapping_add(1);
 
@@ -70,6 +99,6 @@ impl Gameboy {
     }
 
     pub fn screen(&self) -> &screen::Screen {
-        self.hardware.screen()
+        self.ppu.screen()
     }
 }
