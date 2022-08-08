@@ -30,21 +30,6 @@ pub struct Sprite {
     attr: u8,
 }
 
-impl Ord for Sprite {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.x.cmp(&other.x) {
-            std::cmp::Ordering::Equal => self.idx_in_oam.cmp(&other.idx_in_oam),
-            other => other,
-        }
-    }
-}
-
-impl PartialOrd for Sprite {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl PartialEq for Sprite {
     fn eq(&self, other: &Self) -> bool {
         (self.x, self.idx_in_oam) == (other.x, other.idx_in_oam)
@@ -295,16 +280,15 @@ impl Mode {
                         for sprite_opt in sprite_buffer.iter_mut() {
                             match sprite_opt {
                                 Some(sprite) => {
-                                    let sprite_x_range_on_screen = if sprite.x >= 8 {
-                                        let sprite_x_on_screen = sprite.x - 8;
-                                        sprite_x_on_screen..(sprite_x_on_screen + 8)
+                                    let lx_start = if sprite.x >= 8 {
+                                        Some(sprite.x - 8)
                                     } else if sprite.x + 8 > 8 {
-                                        0..sprite.x
+                                        Some(0)
                                     } else {
-                                        0..0
+                                        None
                                     };
 
-                                    if sprite_x_range_on_screen.contains(&lx) {
+                                    if lx_start == Some(lx) {
                                         break 'fetch_sprite_to_render sprite_opt.take();
                                     }
                                 }
@@ -350,7 +334,12 @@ impl Mode {
                 }
 
                 // Check if we need to start fetching the window
-                if ppu.lcdc.display_window() && wy_match_ly && lx == ppu.wx - 7 && !win_fetcher {
+                if scx_delay == 0
+                    && ppu.lcdc.display_window()
+                    && wy_match_ly
+                    && lx >= ppu.wx - 7
+                    && !win_fetcher
+                {
                     bg_win_fetcher = fetcher::BackgroundWindowFetcher::new(
                         ppu.lcdc.window_tile_map(),
                         tiling::PixelPosition::new(0, win_ly as usize),
@@ -367,11 +356,6 @@ impl Mode {
                 if bg_win_fifo.len() > 0 {
                     if scx_delay != 0 {
                         bg_win_fifo.pop();
-
-                        if sprite_fifo.len() > 0 {
-                            sprite_fifo.pop();
-                        }
-
                         scx_delay -= 1;
                     } else {
                         let bg_pixel = bg_win_fifo.pop();
@@ -384,7 +368,7 @@ impl Mode {
                             {
                                 bg_pixel.color()
                             } else {
-                                sprite_pixel.color()
+                                sprite_pixel.color(ppu)
                             }
                         } else {
                             bg_pixel.color()
@@ -516,7 +500,16 @@ impl Mode {
         wy_match_ly: bool,
         win_ly: u8,
     ) -> Mode {
-        sprite_buffer.sort();
+        sprite_buffer.sort_by(|a, b| match a {
+            Some(a) => match b {
+                Some(b) => a.x.cmp(&b.x),
+                None => std::cmp::Ordering::Greater,
+            },
+            None => match b {
+                Some(_) => std::cmp::Ordering::Less,
+                None => std::cmp::Ordering::Equal,
+            },
+        });
 
         Mode::Drawing {
             sprite_buffer,

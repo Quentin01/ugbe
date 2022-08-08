@@ -169,18 +169,13 @@ impl BackgroundWindowFetcher {
 
 #[derive(Debug, Copy, Clone)]
 pub struct SpritePixel {
+    sprite: super::Sprite,
     color_id: super::ColorId,
-    palette: super::Palette,
-    over_bg_and_win: bool,
 }
 
 impl SpritePixel {
-    fn new(palette: super::Palette, color_id: super::ColorId, over_bg_and_win: bool) -> Self {
-        SpritePixel {
-            color_id,
-            palette,
-            over_bg_and_win,
-        }
+    fn new(sprite: super::Sprite, color_id: super::ColorId) -> Self {
+        SpritePixel { sprite, color_id }
     }
 
     pub fn is_zero(&self) -> bool {
@@ -188,11 +183,11 @@ impl SpritePixel {
     }
 
     pub fn over_bg_and_win(&self) -> bool {
-        self.over_bg_and_win
+        self.sprite.over_bg_and_win()
     }
 
-    pub fn color(&self) -> super::screen::Color {
-        self.palette[self.color_id]
+    pub fn color(&self, ppu: &super::Ppu) -> super::screen::Color {
+        self.sprite.palette(ppu)[self.color_id]
     }
 }
 
@@ -300,24 +295,41 @@ impl SpriteFetcher {
 
                 let pixel_row_it: &mut dyn Iterator<Item = super::ColorId> = if self.sprite.x_flip()
                 {
-                    let x_offset = (self.sprite.x - 8 - lx) as usize;
+                    let x_offset = (lx + 8 - self.sprite.x) as usize;
                     pixel_row_rev_it = pixel_row.into_iter().skip(x_offset).rev();
                     &mut pixel_row_rev_it
                 } else {
-                    let x_offset = (self.sprite.x - 8 - lx) as usize;
+                    let x_offset = (lx + 8 - self.sprite.x) as usize;
                     pixel_row_normal_it = pixel_row.into_iter().skip(x_offset);
                     &mut pixel_row_normal_it
                 };
 
                 for (idx, pixel_color_id) in pixel_row_it.enumerate() {
-                    let pixel = SpritePixel::new(
-                        self.sprite.palette(ppu),
-                        pixel_color_id,
-                        self.sprite.over_bg_and_win(),
-                    );
+                    let pixel = SpritePixel::new(self.sprite, pixel_color_id);
 
                     if fifo.len() > idx {
-                        if fifo[idx].is_zero() {
+                        let have_priority = {
+                            let fifo_pixel = &fifo[idx];
+
+                            if pixel.is_zero() {
+                                false
+                            } else if fifo_pixel.is_zero() {
+                                true
+                            } else {
+                                // In non-CGB mode, the smaller the X coordinate, the higher the priority.
+                                // When X coordinates are identical, the object located first in OAM has higher priority.
+                                // In CGB mode, only the object’s location in OAM determines its priority. The earlier the object, the higher its priority.
+                                match pixel.sprite.x.cmp(&fifo_pixel.sprite.x) {
+                                    std::cmp::Ordering::Less => true,
+                                    std::cmp::Ordering::Equal => {
+                                        pixel.sprite.idx_in_oam < fifo_pixel.sprite.idx_in_oam
+                                    }
+                                    std::cmp::Ordering::Greater => false,
+                                }
+                            }
+                        };
+
+                        if have_priority {
                             fifo[idx] = pixel;
                         }
                     } else {
