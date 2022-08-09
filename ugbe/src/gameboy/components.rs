@@ -1,5 +1,3 @@
-use super::{bootrom, cartbridge};
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum InterruptKind {
     VBlank = 1 << 0,
@@ -22,8 +20,8 @@ pub struct MmuContext<'components> {
     pub ppu: &'components mut super::ppu::Ppu,
     pub timer: &'components mut super::timer::Timer,
     pub interrupt: &'components mut super::interrupt::Interrupt,
-    pub boot_rom: &'components mut super::bootrom::BootRom,
-    pub cartbridge: &'components mut super::cartbridge::Cartbridge,
+    pub boot_rom: &'components mut crate::bootrom::BootRom,
+    pub cartridge: &'components mut super::cartridge::Cartridge,
     pub work_ram: &'components mut super::wram::WorkRam<0x1000>,
 }
 

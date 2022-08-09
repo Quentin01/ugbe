@@ -1,6 +1,6 @@
 pub struct Mbc {
     ram: bool,
-    battery_buffered_ram: bool,
+    battery: bool,
 
     multi_cart: bool,
 
@@ -10,34 +10,11 @@ pub struct Mbc {
     mode: bool,
 }
 
-const NINTENDO_LOGO: [u8; 48] = [
-    0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
-    0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
-    0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
-];
-
 impl Mbc {
-    pub fn new(rom: &[u8], ram: bool, battery_buffered_ram: bool) -> Self {
-        let multi_cart = if rom.len() != 1 * 1024 * 1024 {
-            false
-        } else {
-            let nintendo_logo_count = (0..4)
-                .map(|idx| {
-                    let start = idx * 0x40000 + 0x0104;
-                    let end = start + NINTENDO_LOGO.len();
-
-                    &rom[start..end]
-                })
-                .filter(|&possible_logo| possible_logo == NINTENDO_LOGO)
-                .count();
-
-            // From mooneye: A multicart should have at least two games + a menu with valid logo data
-            nintendo_logo_count >= 3
-        };
-
+    pub fn new(ram: bool, battery: bool, multi_cart: bool) -> Self {
         Self {
             ram,
-            battery_buffered_ram,
+            battery,
 
             multi_cart,
 
@@ -110,7 +87,7 @@ impl super::Mbc for Mbc {
     }
 
     fn ram_is_battery_buffered(&self) -> bool {
-        self.battery_buffered_ram
+        self.battery
     }
 
     fn has_rtc(&self) -> bool {
@@ -190,7 +167,7 @@ impl super::Mbc for Mbc {
     fn str(&self) -> std::borrow::Cow<'static, str> {
         let mbc_name = if self.multi_cart { "MBC1M" } else { "MBC1" };
 
-        let extras = if self.ram && self.battery_buffered_ram {
+        let extras = if self.ram && self.battery {
             "Battery-buffered RAM"
         } else if self.ram {
             "RAM"

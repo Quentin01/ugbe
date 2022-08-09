@@ -7,3 +7,4 @@ license = "MIT"
 
 [dependencies]
 paste = "1.0.7"
+thiserror = "1.0.32"

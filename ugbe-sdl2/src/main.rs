@@ -1,8 +1,11 @@
 extern crate sdl2;
 
-use std::io;
+use anyhow::{Context, Result};
 
-use ugbe::gameboy;
+use ugbe::{bootrom, cartridge, gameboy};
+
+const BOOT_ROM_PATH: &str = "/home/quentin/git/ugbe/roms/boot.gb";
+const ROM_PATH: &str = "/home/quentin/git/ugbe/roms/ZeldaLinksAwakeningDX.gb";
 
 const PIXEL_SCALE: usize = 4;
 const FRAMES_TO_BLEND: usize = 1;
@@ -18,38 +21,92 @@ const TEXTURE_WIDTH: u32 = (gameboy::screen::Screen::WIDTH * PIXEL_SCALE) as u32
 const TEXTURE_HEIGHT: u32 = (gameboy::screen::Screen::HEIGHT * PIXEL_SCALE) as u32;
 const TEXTURE_PITCH: usize = (TEXTURE_WIDTH * BYTES_PER_PIXEL) as usize;
 
-fn main() -> Result<(), io::Error> {
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
-    let game_controller_subsystem = sdl_context.game_controller().unwrap();
+#[derive(Debug)]
+struct SdlError(String);
+
+impl std::fmt::Display for SdlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::error::Error for SdlError {}
+
+fn main() -> Result<()> {
+    let boot_rom = bootrom::BootRom::from_path(BOOT_ROM_PATH)
+        .context(format!("unable to parse boom rom '{}'", BOOT_ROM_PATH))?;
+    let cartridge = cartridge::Cartridge::from_rom_path(ROM_PATH)
+        .context(format!("unable to parse rom '{}'", ROM_PATH))?;
+
+    println!("Cartridge:");
+    println!("    Title: {}", cartridge.header().title);
+    println!("    Kind: {}", cartridge.header().kind);
+    println!("    ROM size: {}", cartridge.header().rom_size);
+    println!("    RAM size: {}", cartridge.header().ram_size);
+    println!(
+        "    Manufacturer code: {}",
+        cartridge.header().manufacturer_code
+    );
+    println!("    Licensee code: {}", cartridge.header().licensee_code);
+    println!(
+        "    Destination code: {}",
+        cartridge.header().destination_code
+    );
+    println!("    CGB support: {}", cartridge.header().cgb_suppport);
+    println!("    SGB support: {}", cartridge.header().sgb_suppport);
+    println!("    Version: {}", cartridge.header().rom_version);
+
+    let sdl_context = sdl2::init()
+        .map_err(SdlError)
+        .context("unable to init SDL2")?;
+    let video_subsystem = sdl_context
+        .video()
+        .map_err(SdlError)
+        .context("unable to init SDL2 video subsystem")?;
+    let game_controller_subsystem = sdl_context
+        .game_controller()
+        .map_err(SdlError)
+        .context("unable to init SDL2 game controller subsystem")?;
 
     let mut controllers = vec![];
 
     let window = video_subsystem
-        .window("UGBE", TEXTURE_WIDTH, TEXTURE_HEIGHT)
+        .window(
+            &format!("UGBE - {}", cartridge.header().title),
+            TEXTURE_WIDTH,
+            TEXTURE_HEIGHT,
+        )
         .position_centered()
         .build()
-        .unwrap();
+        .context("unable to init SDL2 window")?;
 
     let mut texture_data = [0; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize];
 
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window
+        .into_canvas()
+        .build()
+        .context("unable to init SDL2 canvas")?;
+
     let texture_creator = canvas.texture_creator();
     let mut texture = texture_creator
         .create_texture_target(TEXTURE_FORMAT, TEXTURE_WIDTH, TEXTURE_HEIGHT)
-        .unwrap();
+        .context("unable to init SDL2 texture")?;
 
-    texture.update(None, &texture_data, TEXTURE_PITCH).unwrap();
-    canvas.copy(&texture, None, None).unwrap();
+    texture
+        .update(None, &texture_data, TEXTURE_PITCH)
+        .context("unable to update SDL2 texture")?;
+    canvas
+        .copy(&texture, None, None)
+        .map_err(SdlError)
+        .context("unable to copy SDL2 texture inside the SDL2 canvas")?;
     canvas.present();
 
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut event_pump = sdl_context
+        .event_pump()
+        .map_err(SdlError)
+        .context("unable to init SDL2 event pump")?;
 
-    let mut gameboy = gameboy::GameboyBuilder::new(
-        "/home/quentin/git/ugbe/roms/boot.gb",
-        "/home/quentin/git/ugbe/roms/ZeldaLinksAwakeningDX.gb",
-    )?
-    .build();
+    let mut gameboy = gameboy::GameboyBuilder::new(boot_rom, cartridge).build();
 
     let mut idx_frame = 0;
     let mut frames = [[sdl2::pixels::Color::RGB(255, 255, 255);
@@ -240,8 +297,13 @@ fn main() -> Result<(), io::Error> {
         let present_duration = {
             let before_present = std::time::Instant::now();
 
-            texture.update(None, &texture_data, TEXTURE_PITCH).unwrap();
-            canvas.copy(&texture, None, None).unwrap();
+            texture
+                .update(None, &texture_data, TEXTURE_PITCH)
+                .context("unable to update SDL2 texture")?;
+            canvas
+                .copy(&texture, None, None)
+                .map_err(SdlError)
+                .context("unable to copy the SDL2 texture inside the SDL2 canvas")?;
             canvas.present();
 
             before_present.elapsed()

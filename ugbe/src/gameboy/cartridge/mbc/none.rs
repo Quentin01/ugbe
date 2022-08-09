@@ -1,14 +1,11 @@
 pub struct Mbc {
     ram: bool,
-    battery_buffered_ram: bool,
+    battery: bool,
 }
 
 impl Mbc {
-    pub fn new(ram: bool, battery_buffered_ram: bool) -> Self {
-        Self {
-            ram,
-            battery_buffered_ram,
-        }
+    pub fn new(ram: bool, battery: bool) -> Self {
+        Self { ram, battery }
     }
 }
 
@@ -18,7 +15,7 @@ impl super::Mbc for Mbc {
     }
 
     fn ram_is_battery_buffered(&self) -> bool {
-        self.battery_buffered_ram
+        self.battery
     }
 
     fn has_rtc(&self) -> bool {
@@ -70,7 +67,7 @@ impl super::Mbc for Mbc {
     }
 
     fn str(&self) -> std::borrow::Cow<'static, str> {
-        (if self.ram && self.battery_buffered_ram {
+        (if self.ram && self.battery {
             "MBC None (Battery-buffered RAM)"
         } else if self.ram {
             "MBC None (RAM)"

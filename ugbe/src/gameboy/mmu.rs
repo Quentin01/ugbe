@@ -17,10 +17,10 @@ impl super::components::Mmu for Mmu {
     fn read_byte(&self, ctx: &super::components::MmuContext, address: u16) -> u8 {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => ctx.boot_rom[address as u8],
-            0x0..=0x3FFF => ctx.cartbridge.read_rom_bank_0(address - 0x0),
-            0x4000..=0x7FFF => ctx.cartbridge.read_rom_bank_n(address - 0x4000),
+            0x0..=0x3FFF => ctx.cartridge.read_rom_bank_0(address - 0x0),
+            0x4000..=0x7FFF => ctx.cartridge.read_rom_bank_n(address - 0x4000),
             0x8000..=0x9FFF => ctx.ppu.read_vram_byte(address - 0x8000),
-            0xA000..=0xBFFF => ctx.cartbridge.read_ram(address - 0xA000),
+            0xA000..=0xBFFF => ctx.cartridge.read_ram(address - 0xA000),
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000],
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000],
             0xFE00..=0xFE9F => ctx.ppu.read_oam_byte(address - 0xFE00),
@@ -70,9 +70,9 @@ impl super::components::Mmu for Mmu {
 
         match address {
             0x0..=0xFF if self.boot_rom_enabled => {}
-            0x0..=0x7FFF => ctx.cartbridge.write_rom(address, value),
+            0x0..=0x7FFF => ctx.cartridge.write_rom(address, value),
             0x8000..=0x9FFF => ctx.ppu.write_vram_byte(address - 0x8000, value),
-            0xA000..=0xBFFF => ctx.cartbridge.write_ram(address - 0xA000, value),
+            0xA000..=0xBFFF => ctx.cartridge.write_ram(address - 0xA000, value),
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000] = value,
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000] = value,
             0xFE00..=0xFE9F => ctx.ppu.write_oam_byte(address - 0xFE00, value),

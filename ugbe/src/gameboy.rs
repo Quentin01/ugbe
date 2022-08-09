@@ -1,8 +1,5 @@
-use std::{fs, io, path::Path};
-
-mod bootrom;
 mod bus;
-mod cartbridge;
+mod cartridge;
 mod components;
 mod cpu;
 mod interrupt;
@@ -15,38 +12,25 @@ mod wram;
 pub use ppu::screen;
 
 pub struct GameboyBuilder {
-    boot_rom: bootrom::BootRom,
-    cartbridge: cartbridge::Cartbridge,
+    boot_rom: crate::bootrom::BootRom,
+    cartridge: crate::cartridge::Cartridge,
 }
 
 impl GameboyBuilder {
-    pub fn new<P: ?Sized + AsRef<Path>>(
-        boot_rom_path: &P,
-        rom_path: &P,
-    ) -> Result<Self, io::Error> {
-        let boot_rom_file = fs::File::open(boot_rom_path)?;
-        let mut boot_rom_reader = io::BufReader::new(boot_rom_file);
-        let mut boot_rom_buffer = Vec::new();
-
-        io::Read::read_to_end(&mut boot_rom_reader, &mut boot_rom_buffer)?;
-
-        let rom_file = fs::File::open(rom_path)?;
-        let mut rom_reader = io::BufReader::new(rom_file);
-        let mut rom_buffer = Vec::new();
-
-        io::Read::read_to_end(&mut rom_reader, &mut rom_buffer)?;
-
-        Ok(Self {
-            boot_rom: boot_rom_buffer.into(),
-            cartbridge: rom_buffer.into(),
-        })
+    // TODO: Remove the requirements of the boot rom and allow to construct a Gameboy without it
+    // TODO: Check that the cartridge is ok (for example if CGB is required we won't be able to boot the game
+    pub fn new(boot_rom: crate::bootrom::BootRom, cartridge: crate::cartridge::Cartridge) -> Self {
+        Self {
+            boot_rom,
+            cartridge,
+        }
     }
 
     pub fn build(self) -> Gameboy {
         Gameboy {
             mmu: mmu::Mmu::new(),
             boot_rom: self.boot_rom,
-            cartbridge: self.cartbridge,
+            cartridge: self.cartridge.into(),
             joypad: joypad::Joypad::new(),
             ppu: ppu::Ppu::new(),
             cpu: cpu::Cpu::new(),
@@ -61,8 +45,8 @@ impl GameboyBuilder {
 
 pub struct Gameboy {
     mmu: mmu::Mmu,
-    boot_rom: bootrom::BootRom,
-    cartbridge: cartbridge::Cartbridge,
+    boot_rom: crate::bootrom::BootRom,
+    cartridge: cartridge::Cartridge,
     joypad: joypad::Joypad,
     ppu: ppu::Ppu,
     cpu: cpu::Cpu,
@@ -88,7 +72,7 @@ impl Gameboy {
                     timer: &mut self.timer,
                     interrupt: &mut self.interrupt,
                     boot_rom: &mut self.boot_rom,
-                    cartbridge: &mut self.cartbridge,
+                    cartridge: &mut self.cartridge,
                     work_ram: &mut self.work_ram,
                 },
             );

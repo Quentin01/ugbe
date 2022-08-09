@@ -6,5 +6,6 @@ authors = ["Quentin BUATHIER <quentinbuathier@gmail.com>"]
 license = "MIT"
 
 [dependencies]
+anyhow = "1.0.60"
 sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
 ugbe = { version = "=0.1.0", path = "../ugbe" }

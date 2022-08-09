@@ -21,18 +21,14 @@ pub trait Mbc {
     fn str(&self) -> Cow<'static, str>;
 }
 
-pub fn new_none(ram: bool, battery_buffered_ram: bool) -> Box<dyn Mbc> {
-    Box::new(none::Mbc::new(ram, battery_buffered_ram))
+pub fn new_none(ram: bool, battery: bool) -> Box<dyn Mbc> {
+    Box::new(none::Mbc::new(ram, battery))
 }
 
-pub fn new_mbc1(rom: &[u8], ram: bool, battery_buffered_ram: bool) -> Box<dyn Mbc> {
-    Box::new(mbc1::Mbc::new(rom, ram, battery_buffered_ram))
+pub fn new_mbc1(ram: bool, battery: bool, multi_cart: bool) -> Box<dyn Mbc> {
+    Box::new(mbc1::Mbc::new(ram, battery, multi_cart))
 }
 
-pub fn new_mbc3(ram: bool, battery_buffered_ram: bool, rtc: bool) -> Box<dyn Mbc> {
-    todo!("New MBC3");
-}
-
-pub fn new_mbc5(ram: bool, battery_buffered_ram: bool, rumble: bool) -> Box<dyn Mbc> {
-    Box::new(mbc5::Mbc::new(ram, battery_buffered_ram, rumble))
+pub fn new_mbc5(ram: bool, battery: bool, rumble: bool) -> Box<dyn Mbc> {
+    Box::new(mbc5::Mbc::new(ram, battery, rumble))
 }
