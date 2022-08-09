@@ -117,7 +117,7 @@ impl Joypad {
         }
     }
 
-    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
+    pub(super) fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
         if (!self.data & self.last_data & 0xF) != 0 {
             // If an input was 1 at the previous tick and switch to 0 for this tick
             interrupt_line.request(InterruptKind::Joypad);
@@ -140,11 +140,11 @@ impl Joypad {
         self.update_inputs();
     }
 
-    pub fn read_p1(&self) -> u8 {
+    pub(super) fn read_p1(&self) -> u8 {
         self.data
     }
 
-    pub fn write_p1(&mut self, value: u8) {
+    pub(super) fn write_p1(&mut self, value: u8) {
         self.data = (self.data & 0b11001111) | (value & 0b00110000);
 
         self.update_inputs();

@@ -10,10 +10,6 @@ const ROM_PATH: &str = "/home/quentin/git/ugbe/roms/ZeldaLinksAwakeningDX.gb";
 const PIXEL_SCALE: usize = 4;
 const FRAMES_TO_BLEND: usize = 1;
 
-const GAMEBOY_FREQUENCY: usize = 4_194_304;
-const T_CYCLE_DURATION: std::time::Duration =
-    std::time::Duration::new(0, (1_000_000_000f64 / GAMEBOY_FREQUENCY as f64) as u32);
-
 const TEXTURE_FORMAT: sdl2::pixels::PixelFormatEnum = sdl2::pixels::PixelFormatEnum::RGB24;
 const BYTES_PER_PIXEL: u32 = 3;
 
@@ -149,46 +145,56 @@ fn main() -> Result<()> {
                     }
                 }
                 sdl2::event::Event::ControllerButtonUp { button, .. } => match button {
-                    sdl2::controller::Button::A => gameboy.keyup(gameboy::joypad::Button::A),
-                    sdl2::controller::Button::B => gameboy.keyup(gameboy::joypad::Button::B),
+                    sdl2::controller::Button::A => {
+                        gameboy.joypad().keyup(gameboy::joypad::Button::A)
+                    }
+                    sdl2::controller::Button::B => {
+                        gameboy.joypad().keyup(gameboy::joypad::Button::B)
+                    }
                     sdl2::controller::Button::Start => {
-                        gameboy.keyup(gameboy::joypad::Button::Start)
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Start)
                     }
                     sdl2::controller::Button::Back => {
-                        gameboy.keyup(gameboy::joypad::Button::Select)
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Select)
                     }
-                    sdl2::controller::Button::DPadUp => gameboy.keyup(gameboy::joypad::Button::Up),
+                    sdl2::controller::Button::DPadUp => {
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Up)
+                    }
                     sdl2::controller::Button::DPadDown => {
-                        gameboy.keyup(gameboy::joypad::Button::Down)
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Down)
                     }
                     sdl2::controller::Button::DPadLeft => {
-                        gameboy.keyup(gameboy::joypad::Button::Left)
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Left)
                     }
                     sdl2::controller::Button::DPadRight => {
-                        gameboy.keyup(gameboy::joypad::Button::Right)
+                        gameboy.joypad().keyup(gameboy::joypad::Button::Right)
                     }
                     _ => {}
                 },
                 sdl2::event::Event::ControllerButtonDown { button, .. } => match button {
-                    sdl2::controller::Button::A => gameboy.keydown(gameboy::joypad::Button::A),
-                    sdl2::controller::Button::B => gameboy.keydown(gameboy::joypad::Button::B),
+                    sdl2::controller::Button::A => {
+                        gameboy.joypad().keydown(gameboy::joypad::Button::A)
+                    }
+                    sdl2::controller::Button::B => {
+                        gameboy.joypad().keydown(gameboy::joypad::Button::B)
+                    }
                     sdl2::controller::Button::Start => {
-                        gameboy.keydown(gameboy::joypad::Button::Start)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Start)
                     }
                     sdl2::controller::Button::Back => {
-                        gameboy.keydown(gameboy::joypad::Button::Select)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Select)
                     }
                     sdl2::controller::Button::DPadUp => {
-                        gameboy.keydown(gameboy::joypad::Button::Up)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Up)
                     }
                     sdl2::controller::Button::DPadDown => {
-                        gameboy.keydown(gameboy::joypad::Button::Down)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Down)
                     }
                     sdl2::controller::Button::DPadLeft => {
-                        gameboy.keydown(gameboy::joypad::Button::Left)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Left)
                     }
                     sdl2::controller::Button::DPadRight => {
-                        gameboy.keydown(gameboy::joypad::Button::Right)
+                        gameboy.joypad().keydown(gameboy::joypad::Button::Right)
                     }
                     _ => {}
                 },
@@ -197,12 +203,10 @@ fn main() -> Result<()> {
         }
 
         // Running the emulation until a LCDOff or a VBlank
-        let (run_duration, elapsed_cycles) = {
+        let (run_duration, expected_frame_duration) = {
             let before_run = std::time::Instant::now();
-            let mut elapsed_cycles: u32 = 0;
+            let before_emulation = gameboy.clock().now();
             loop {
-                elapsed_cycles += 1;
-
                 match gameboy.tick() {
                     Some(screen_event) => match screen_event {
                         gameboy::screen::Event::VBlank => break,
@@ -214,7 +218,10 @@ fn main() -> Result<()> {
                     None => {}
                 }
             }
-            (before_run.elapsed(), elapsed_cycles)
+            (
+                before_run.elapsed(),
+                before_emulation.elapsed(gameboy.clock()),
+            )
         };
 
         // Update the texture with the pixels from the gameboy screen
@@ -310,7 +317,6 @@ fn main() -> Result<()> {
         };
 
         // Fix the framing time by sleeping if necessary
-        let expected_frame_duration = T_CYCLE_DURATION * elapsed_cycles;
         let frame_duration = before_frame.elapsed();
 
         if frame_duration + lag_duration < expected_frame_duration {

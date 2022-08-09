@@ -1,5 +1,6 @@
 mod bus;
 mod cartridge;
+pub mod clock;
 mod components;
 mod cpu;
 mod interrupt;
@@ -38,7 +39,7 @@ impl GameboyBuilder {
             interrupt: interrupt::Interrupt::new(),
             work_ram: wram::WorkRam::new(),
             timer: timer::Timer::new(),
-            t_cycle_count: 0,
+            clock: clock::Clock::new(),
         }
     }
 }
@@ -54,14 +55,12 @@ pub struct Gameboy {
     interrupt: interrupt::Interrupt,
     work_ram: wram::WorkRam<0x1000>,
     timer: timer::Timer,
-    t_cycle_count: usize,
+    clock: clock::Clock,
 }
 
 impl Gameboy {
     pub fn tick(&mut self) -> Option<screen::Event> {
-        // TODO: Currently the CPU is ticking every m-cycle and the hardware needs it every t-cycle
-        //       In the future, this should be handled by ticking every t-cycle for each
-        if self.t_cycle_count % 4 == 0 {
+        if self.clock.is_m_cycle() {
             let memory_operation = self.cpu.tick(&self.bus, &mut self.interrupt);
             self.bus.tick(
                 memory_operation,
@@ -82,17 +81,17 @@ impl Gameboy {
         self.timer.tick(&mut self.interrupt);
         self.joypad.tick(&mut self.interrupt);
 
-        self.t_cycle_count = self.t_cycle_count.wrapping_add(1);
+        self.clock.tick();
 
         screen_event
     }
 
-    pub fn keydown(&mut self, button: joypad::Button) {
-        self.joypad.keydown(button)
+    pub fn clock(&self) -> &clock::Clock {
+        &self.clock
     }
 
-    pub fn keyup(&mut self, button: joypad::Button) {
-        self.joypad.keyup(button)
+    pub fn joypad(&mut self) -> &mut joypad::Joypad {
+        &mut self.joypad
     }
 
     pub fn screen(&self) -> &screen::Screen {
