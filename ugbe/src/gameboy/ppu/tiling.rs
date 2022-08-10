@@ -7,12 +7,6 @@ impl From<u8> for TileNo {
     }
 }
 
-impl From<TileNo> for u8 {
-    fn from(tile_no: TileNo) -> Self {
-        tile_no.0
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
 pub struct PixelPosition {
     x: u8,

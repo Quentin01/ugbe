@@ -1,65 +1,29 @@
 use std::fmt::Debug;
 
+use self::oam::SpriteNo;
+
 use super::components::{InterruptKind, InterruptLine};
 
 mod color;
 mod fetcher;
 mod fifo;
+mod oam;
 mod registers;
 pub mod screen;
 mod tiling;
 
 #[derive(Debug, Copy, Clone)]
-pub struct Sprite {
-    idx_in_oam: usize,
-    y: u8,
-    x: u8,
-    tile_no: tiling::TileNo,
-    attr: u8,
-}
-
-impl PartialEq for Sprite {
-    fn eq(&self, other: &Self) -> bool {
-        (self.x, self.idx_in_oam) == (other.x, other.idx_in_oam)
-    }
-}
-
-impl Eq for Sprite {}
-
-impl Sprite {
-    fn palette(&self, ppu: &Ppu) -> color::Palette {
-        if self.attr & (1 << 4) == 0 {
-            ppu.obp0
-        } else {
-            ppu.obp1
-        }
-    }
-
-    fn x_flip(&self) -> bool {
-        self.attr & (1 << 5) != 0
-    }
-
-    fn y_flip(&self) -> bool {
-        self.attr & (1 << 6) != 0
-    }
-
-    fn over_bg_and_win(&self) -> bool {
-        self.attr & (1 << 7) == 0
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
 pub enum Mode {
     OAMScan {
-        sprite_buffer: [Option<Sprite>; 10],
+        sprite_buffer: [Option<oam::Sprite>; 10],
         sprite_buffer_idx: usize,
         wy_match_ly: bool,
-        sprite_idx: usize,
-        current_sprite: Option<Sprite>,
+        sprite_no: oam::SpriteNo,
+        current_sprite: Option<oam::Sprite>,
         win_ly: u8,
     },
     Drawing {
-        sprite_buffer: [Option<Sprite>; 10],
+        sprite_buffer: [Option<oam::Sprite>; 10],
         wy_match_ly: bool,
         scx_delay: u8,
         lx: u8,
@@ -88,7 +52,7 @@ impl Default for Mode {
             sprite_buffer: [None; 10],
             sprite_buffer_idx: 0,
             wy_match_ly: false,
-            sprite_idx: 0,
+            sprite_no: SpriteNo::first(),
             current_sprite: None,
             win_ly: 0,
         }
@@ -111,7 +75,7 @@ impl Mode {
                 mut sprite_buffer,
                 mut sprite_buffer_idx,
                 wy_match_ly,
-                sprite_idx,
+                sprite_no,
                 current_sprite,
                 win_ly,
             } => {
@@ -119,22 +83,14 @@ impl Mode {
                 match current_sprite {
                     None => {
                         // During even T-cycles we will just fetch the sprite
-                        let idx_in_oam = sprite_idx * 4;
-
-                        let sprite = Sprite {
-                            idx_in_oam,
-                            y: ppu.oam[idx_in_oam],
-                            x: ppu.oam[idx_in_oam + 1],
-                            tile_no: ppu.oam[idx_in_oam + 2].into(),
-                            attr: ppu.oam[idx_in_oam + 3],
-                        };
+                        let sprite = ppu.oam.sprite(sprite_no);
 
                         (
                             Mode::OAMScan {
                                 sprite_buffer,
                                 sprite_buffer_idx,
                                 wy_match_ly: if ppu.wy == ppu.ly { true } else { wy_match_ly },
-                                sprite_idx: sprite_idx + 1,
+                                sprite_no: sprite_no.wrapping_inc(),
                                 current_sprite: Some(sprite),
                                 win_ly,
                             },
@@ -144,7 +100,7 @@ impl Mode {
                     Some(current_sprite) => {
                         // During odd T-cycles we are checking if the sprite should be added to the sprite buffer
                         if sprite_buffer_idx >= 10 {
-                            if sprite_idx >= 40 {
+                            if sprite_no >= oam::SpriteNo::last() {
                                 return (
                                     Mode::switch_from_oam_scan_to_drawing(
                                         ppu,
@@ -160,7 +116,7 @@ impl Mode {
                                         sprite_buffer,
                                         sprite_buffer_idx,
                                         wy_match_ly,
-                                        sprite_idx,
+                                        sprite_no,
                                         current_sprite: None,
                                         win_ly,
                                     },
@@ -171,11 +127,11 @@ impl Mode {
 
                         let sprite_height = ppu.lcdc.sprite_height();
 
-                        let sprite_y_range_on_screen = if current_sprite.y >= 16 {
-                            let sprite_y_on_screen = current_sprite.y - 16;
+                        let sprite_y_range_on_screen = if current_sprite.y() >= 16 {
+                            let sprite_y_on_screen = current_sprite.y() - 16;
                             sprite_y_on_screen..(sprite_y_on_screen + sprite_height)
-                        } else if sprite_height + current_sprite.y > 16 {
-                            0..(sprite_height + current_sprite.y - 16)
+                        } else if sprite_height + current_sprite.y() > 16 {
+                            0..(sprite_height + current_sprite.y() - 16)
                         } else {
                             0..0
                         };
@@ -185,7 +141,7 @@ impl Mode {
                             sprite_buffer_idx += 1;
                         }
 
-                        if sprite_idx >= 40 {
+                        if sprite_no >= oam::SpriteNo::last() {
                             (
                                 Mode::switch_from_oam_scan_to_drawing(
                                     ppu,
@@ -201,7 +157,7 @@ impl Mode {
                                     sprite_buffer,
                                     sprite_buffer_idx,
                                     wy_match_ly,
-                                    sprite_idx,
+                                    sprite_no,
                                     current_sprite: None,
                                     win_ly,
                                 },
@@ -238,9 +194,9 @@ impl Mode {
                         for sprite_opt in sprite_buffer.iter_mut() {
                             match sprite_opt {
                                 Some(sprite) => {
-                                    let lx_start = if sprite.x >= 8 {
-                                        Some(sprite.x - 8)
-                                    } else if sprite.x + 8 > 8 {
+                                    let lx_start = if sprite.x() >= 8 {
+                                        Some(sprite.x() - 8)
+                                    } else if sprite.x() + 8 > 8 {
                                         Some(0)
                                     } else {
                                         None
@@ -452,13 +408,13 @@ impl Mode {
 
     fn switch_from_oam_scan_to_drawing(
         ppu: &mut Ppu,
-        mut sprite_buffer: [Option<Sprite>; 10],
+        mut sprite_buffer: [Option<oam::Sprite>; 10],
         wy_match_ly: bool,
         win_ly: u8,
     ) -> Mode {
         sprite_buffer.sort_by(|a, b| match a {
             Some(a) => match b {
-                Some(b) => a.x.cmp(&b.x),
+                Some(b) => a.x().cmp(&b.x()),
                 None => std::cmp::Ordering::Greater,
             },
             None => match b {
@@ -544,7 +500,7 @@ impl Mode {
             sprite_buffer: [None; 10],
             sprite_buffer_idx: 0,
             wy_match_ly,
-            sprite_idx: 0,
+            sprite_no: oam::SpriteNo::first(),
             current_sprite: None,
             win_ly,
         }
@@ -578,7 +534,7 @@ pub struct Ppu {
     obp1: color::Palette,
     mode: Mode,
     vram: [u8; 0x2000],
-    oam: [u8; 0x100],
+    oam: oam::Oam,
     screen: screen::Screen,
     ldc_event: Option<screen::Event>,
 }
@@ -613,7 +569,7 @@ impl Ppu {
             obp1: 0.into(),
             mode: Mode::default(),
             vram: [0x0; 0x2000],
-            oam: [0x0; 0x100],
+            oam: oam::Oam::new(),
             screen: screen::Screen::new(screen_config),
             ldc_event: None,
         }
@@ -655,14 +611,14 @@ impl Ppu {
     pub fn read_oam_byte(&self, address: u16) -> u8 {
         match self.mode {
             Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => 0xFF,
-            _ => self.oam[address as usize],
+            _ => self.oam.read_byte(address),
         }
     }
 
     pub fn write_oam_byte(&mut self, address: u16, value: u8) {
         match self.mode {
             Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => {}
-            _ => self.oam[address as usize] = value,
+            _ => self.oam.write_byte(address, value),
         }
     }
 

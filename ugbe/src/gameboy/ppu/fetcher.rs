@@ -169,12 +169,12 @@ impl BackgroundWindowFetcher {
 
 #[derive(Debug, Copy, Clone)]
 pub struct SpritePixel {
-    sprite: super::Sprite,
+    sprite: super::oam::Sprite,
     color_id: super::color::Id,
 }
 
 impl SpritePixel {
-    fn new(sprite: super::Sprite, color_id: super::color::Id) -> Self {
+    fn new(sprite: super::oam::Sprite, color_id: super::color::Id) -> Self {
         SpritePixel { sprite, color_id }
     }
 
@@ -193,17 +193,17 @@ impl SpritePixel {
 
 #[derive(Debug, Copy, Clone)]
 pub struct SpriteFetcher {
-    sprite: super::Sprite,
+    sprite: super::oam::Sprite,
     state: FetcherState,
     pixel_row: u8,
 }
 
 impl SpriteFetcher {
-    pub fn new(sprite: super::Sprite, ppu: &super::Ppu) -> Self {
+    pub fn new(sprite: super::oam::Sprite, ppu: &super::Ppu) -> Self {
         let pixel_row = if sprite.y_flip() {
-            ppu.lcdc.sprite_height() - (ppu.ly + 16 - sprite.y) - 1
+            ppu.lcdc.sprite_height() - (ppu.ly + 16 - sprite.y()) - 1
         } else {
-            ppu.ly + 16 - sprite.y
+            ppu.ly + 16 - sprite.y()
         };
 
         Self {
@@ -222,7 +222,7 @@ impl SpriteFetcher {
         let mut new_state = match self.state {
             FetcherState::GetTile { elapsed_cycle } => {
                 if elapsed_cycle == 1 {
-                    let tile_no = self.sprite.tile_no;
+                    let tile_no = self.sprite.tile_no();
 
                     FetcherState::GetTileDataLow {
                         elapsed_cycle: 0,
@@ -295,11 +295,11 @@ impl SpriteFetcher {
 
                 let pixel_row_it: &mut dyn Iterator<Item = super::color::Id> =
                     if self.sprite.x_flip() {
-                        let x_offset = (lx + 8 - self.sprite.x) as usize;
+                        let x_offset = (lx + 8 - self.sprite.x()) as usize;
                         pixel_row_rev_it = pixel_row.into_iter().skip(x_offset).rev();
                         &mut pixel_row_rev_it
                     } else {
-                        let x_offset = (lx + 8 - self.sprite.x) as usize;
+                        let x_offset = (lx + 8 - self.sprite.x()) as usize;
                         pixel_row_normal_it = pixel_row.into_iter().skip(x_offset);
                         &mut pixel_row_normal_it
                     };
@@ -319,10 +319,10 @@ impl SpriteFetcher {
                                 // In non-CGB mode, the smaller the X coordinate, the higher the priority.
                                 // When X coordinates are identical, the object located first in OAM has higher priority.
                                 // In CGB mode, only the object’s location in OAM determines its priority. The earlier the object, the higher its priority.
-                                match pixel.sprite.x.cmp(&fifo_pixel.sprite.x) {
+                                match pixel.sprite.x().cmp(&fifo_pixel.sprite.x()) {
                                     std::cmp::Ordering::Less => true,
                                     std::cmp::Ordering::Equal => {
-                                        pixel.sprite.idx_in_oam < fifo_pixel.sprite.idx_in_oam
+                                        pixel.sprite.no() < fifo_pixel.sprite.no()
                                     }
                                     std::cmp::Ordering::Greater => false,
                                 }
