@@ -18,7 +18,7 @@ impl SpriteNo {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Sprite {
     no: SpriteNo,
     y: u8,
@@ -65,7 +65,7 @@ impl Sprite {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Oam {
     data: [u8; SPRITE_COUNT * SPRITE_SIZE],
 }

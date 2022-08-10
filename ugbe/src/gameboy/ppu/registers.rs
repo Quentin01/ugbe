@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Lcdc(u8);
 
 impl From<u8> for Lcdc {
@@ -79,7 +79,7 @@ impl Lcdc {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Stat(u8);
 
 impl From<u8> for Stat {

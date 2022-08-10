@@ -3,7 +3,7 @@ pub enum FrameBlending {
     Interframe(usize),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ColorPalette {
     off: Color,
     dmg_white: Color,
@@ -68,7 +68,7 @@ impl Default for ColorPalette {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Config {
     frame_blending: Option<FrameBlending>,
     color_palette: ColorPalette,
@@ -122,7 +122,7 @@ impl Color {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 struct Frame {
     pixels: [super::color::Color; Screen::WIDTH * Screen::HEIGHT],
 }
@@ -139,7 +139,7 @@ impl Frame {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Screen {
     config: Config,
     idx_frame: usize,
@@ -256,6 +256,7 @@ impl Screen {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Event {
     VBlank,
     LCDOn,

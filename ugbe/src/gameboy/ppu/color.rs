@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id {
     msb: bool,
     lsb: bool,
@@ -17,7 +17,7 @@ impl Id {
     };
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Palette(u8);
 
 impl From<u8> for Palette {
@@ -47,7 +47,7 @@ impl Index<Id> for Palette {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DMGColor {
     White,
     LightGray,
@@ -55,7 +55,7 @@ pub enum DMGColor {
     Black,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Color {
     Dmg(DMGColor),
     Off,

@@ -12,7 +12,7 @@ mod registers;
 pub mod screen;
 mod tiling;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Mode {
     OAMScan {
         sprite_buffer: [Option<oam::Sprite>; 10],
@@ -518,6 +518,7 @@ impl Mode {
     }
 }
 
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Ppu {
     skip_frame: bool,
     lcdc: registers::Lcdc,

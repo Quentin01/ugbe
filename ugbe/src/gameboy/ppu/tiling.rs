@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TileNo(u8);
 
 impl From<u8> for TileNo {
@@ -7,7 +7,7 @@ impl From<u8> for TileNo {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct PixelPosition {
     x: u8,
     y: u8,
@@ -38,7 +38,7 @@ impl PixelPosition {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TilePosition {
     x: u8,
     y: u8,
@@ -75,7 +75,7 @@ impl TilePosition {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TileMap {
     start: u16,
 }
@@ -98,18 +98,18 @@ impl TileMap {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum TileDataMapMethod {
     Method8000,
     Method8800,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Tile<'a> {
     data: &'a [u8],
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TileLowRowData(u8);
 
 impl From<u8> for TileLowRowData {
@@ -124,7 +124,7 @@ impl From<TileLowRowData> for u8 {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TileHighRowData(u8);
 
 impl From<u8> for TileHighRowData {
@@ -155,7 +155,7 @@ impl<'a> Tile<'a> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct TileDataMap {
     size: u8,
     method: TileDataMapMethod,

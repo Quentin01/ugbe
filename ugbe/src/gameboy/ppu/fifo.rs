@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Fifo<T: Copy + Clone, const SIZE: usize = 10> {
     data: [Option<T>; SIZE],
     start: usize,
