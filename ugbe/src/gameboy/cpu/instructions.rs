@@ -8,7 +8,7 @@ use super::super::components::{Mmu, MmuContext};
 use super::registers::Registers;
 use super::MemoryOperation;
 
-pub trait Instruction {
+pub trait Instruction: Send + Sync {
     fn raw_desc(&self) -> Cow<'static, str>;
 
     fn desc(&self, pc: u16, mmu: &dyn Mmu, mmu_ctx: &MmuContext) -> Cow<'static, str> {
@@ -58,7 +58,7 @@ pub enum InstructionExecutionState {
     Complete,
 }
 
-pub trait InstructionExecution {
+pub trait InstructionExecution: Send + Sync {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState;
 }
 

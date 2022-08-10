@@ -36,7 +36,7 @@ where
     Op: Operand<Value = u16>,
 {
     fn str() -> Cow<'static, str> {
-        Op::str().into()
+        Op::str()
     }
 
     fn address(_: &mut Registers, value: u16) -> u16 {
@@ -73,7 +73,13 @@ where
 }
 
 pub trait EndianNumeric {
-    type Array: Default + Index<usize, Output = u8> + IndexMut<usize, Output = u8> + Sized;
+    type Array: Default
+        + Index<usize, Output = u8>
+        + IndexMut<usize, Output = u8>
+        + Sized
+        + Send
+        + Sync
+        + 'static;
 
     fn from_le_bytes(bytes: Self::Array) -> Self;
     fn to_le_bytes(value: Self) -> Self::Array;
@@ -105,9 +111,9 @@ impl EndianNumeric for u16 {
 
 pub struct DerefOperand<Op, Value = u8, AddressOperation = NoneAddress>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     phantom: PhantomData<(Op, Value, AddressOperation)>,
@@ -115,9 +121,9 @@ where
 
 impl<Op, Value, AddressOperation> Operand for DerefOperand<Op, Value, AddressOperation>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     type Value = Value;
@@ -129,13 +135,13 @@ where
 
 enum ReadDerefOperand<Op, Value = u8, AddressOperation = NoneAddress>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     Start(PhantomData<(Op, Value, AddressOperation)>),
-    WaitingForAddress(Box<dyn OperandReadExecution<Op::Value>>),
+    WaitingForAddress(Box<dyn OperandReadExecution<Op::Value> + 'static>),
     Dereferencing(u16, Value::Array, usize),
     Complete(Value),
 }
@@ -144,9 +150,9 @@ impl<Op, Value, AddressOperation>
     OperandReadExecution<<DerefOperand<Op, Value, AddressOperation> as Operand>::Value>
     for ReadDerefOperand<Op, Value, AddressOperation>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     fn next(
@@ -200,12 +206,12 @@ where
 
 impl<Op, Value, AddressOperation> OperandIn for DerefOperand<Op, Value, AddressOperation>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
-    fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+    fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
         Box::new(ReadDerefOperand::<Op, Value, AddressOperation>::Start(
             PhantomData,
         ))
@@ -214,13 +220,13 @@ where
 
 enum WriteDerefOperand<Op, Value = u8, AddressOperation = NoneAddress>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     Start(PhantomData<(Op, Value, AddressOperation)>, Value),
-    WaitingForAddress(Box<dyn OperandReadExecution<Op::Value>>, Value),
+    WaitingForAddress(Box<dyn OperandReadExecution<Op::Value> + 'static>, Value),
     Dereferencing(u16, Value::Array, usize),
     Complete,
 }
@@ -228,9 +234,9 @@ where
 impl<Op, Value, AddressOperation> OperandWriteExecution
     for WriteDerefOperand<Op, Value, AddressOperation>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> OperandWriteExecutionState {
@@ -282,12 +288,12 @@ where
 
 impl<Op, Value, AddressOperation> OperandOut for DerefOperand<Op, Value, AddressOperation>
 where
-    Op: Operand + OperandIn + 'static,
-    Value: Copy + EndianNumeric + 'static,
-    AddressOperation: 'static,
+    Op: Operand + OperandIn + Send + Sync + 'static,
+    Value: Copy + EndianNumeric + Send + Sync + 'static,
+    AddressOperation: Send + Sync + 'static,
     (Op, <Op as Operand>::Value, AddressOperation): ValueToAddress<<Op as Operand>::Value>,
 {
-    fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution> {
+    fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution + 'static> {
         Box::new(WriteDerefOperand::<Op, Value, AddressOperation>::Start(
             PhantomData,
             value,

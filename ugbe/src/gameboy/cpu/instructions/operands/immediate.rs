@@ -43,7 +43,7 @@ where
 
 impl<Op> OperandReadExecution<Op::Value> for ReadImmediate<Op>
 where
-    Op: OperandImmediate,
+    Op: OperandImmediate + Send + Sync + 'static,
     <Op as Operand>::Value: std::ops::BitOr<Output = <Op as Operand>::Value>
         + std::ops::Shl<usize, Output = <Op as Operand>::Value>
         + ImmediateFromU8,
@@ -86,7 +86,7 @@ where
 pub enum ReadR16PlusOff8<Reg, Off>
 where
     Reg: Operand<Value = u16> + OperandRegister,
-    Off: Operand<Value = i8> + OperandImmediate + 'static,
+    Off: Operand<Value = i8> + OperandImmediate,
 {
     Start(PhantomData<(Reg, Off)>),
     Computing,
@@ -96,7 +96,7 @@ where
 impl<Reg, Off> OperandReadExecution<u16> for ReadR16PlusOff8<Reg, Off>
 where
     Reg: Operand<Value = u16> + OperandRegister,
-    Off: Operand<Value = i8> + OperandImmediate + 'static,
+    Off: Operand<Value = i8> + OperandImmediate,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> OperandReadExecutionState<u16> {
         match std::mem::replace(self, Self::Complete(0)) {

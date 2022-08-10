@@ -13,16 +13,16 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct AluOne<AluOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
-    Op: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     phantom: PhantomData<(AluOp, Op)>,
 }
 
 impl<AluOp, Op> AluOne<AluOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
-    Op: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -33,8 +33,8 @@ where
 
 impl<AluOp, Op> Instruction for AluOne<AluOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + 'static,
-    Op: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("{} {}", AluOp::STR, Op::str()).into()
@@ -51,18 +51,18 @@ where
 
 pub struct AluTwo<AluOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + 'static,
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     phantom: PhantomData<(AluOp, Src, Dst)>,
 }
 
 impl<AluOp, Dst, Src> AluTwo<AluOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + 'static,
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -73,9 +73,9 @@ where
 
 impl<AluOp, Dst, Src> Instruction for AluTwo<AluOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + 'static,
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand + OperandIn + OperandOut + 'static,
+    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("{} {}, {}", AluOp::STR, Dst::str(), Src::str()).into()
@@ -96,16 +96,16 @@ where
 
 pub struct AluBit<AluOp, const BIT_POS: u8, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + 'static,
-    Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
+    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
     phantom: PhantomData<(AluOp, Op)>,
 }
 
 impl<AluOp, const BIT_POS: u8, Op> AluBit<AluOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + 'static,
-    Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
+    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -116,8 +116,8 @@ where
 
 impl<AluOp, const BIT_POS: u8, Op> Instruction for AluBit<AluOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + 'static,
-    Op: Operand<Value = u8> + OperandIn + OperandOut + 'static,
+    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("{} {}, {}", AluOp::STR, BIT_POS, Op::str()).into()
@@ -132,17 +132,19 @@ where
 
 enum AluExecution<Dst, Src, AluFn, const DST_IS_SRC: bool>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand + OperandIn + OperandOut + 'static,
-    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value> + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
+    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value>
+        + Send
+        + 'static,
 {
     Start(AluFn),
     ReadingFromSrc {
-        operand_read_value: Box<dyn OperandReadExecution<Src::Value>>,
+        operand_read_value: Box<dyn OperandReadExecution<Src::Value> + 'static>,
         alu_fn: AluFn,
     },
     ReadingFromDst {
-        operand_read_value: Box<dyn OperandReadExecution<Dst::Value>>,
+        operand_read_value: Box<dyn OperandReadExecution<Dst::Value> + 'static>,
         alu_fn: AluFn,
         src: Src::Value,
     },
@@ -151,7 +153,7 @@ where
         dst: Option<Dst::Value>,
         src: Src::Value,
     },
-    WritingToDst(Box<dyn OperandWriteExecution>),
+    WritingToDst(Box<dyn OperandWriteExecution + 'static>),
     Wait(usize),
     Complete,
 }
@@ -159,9 +161,12 @@ where
 impl<Dst, Src, AluFn, const DST_IS_SRC: bool> InstructionExecution
     for AluExecution<Dst, Src, AluFn, DST_IS_SRC>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand + OperandIn + OperandOut + 'static,
-    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value> + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
+    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value>
+        + Send
+        + Sync
+        + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         // ALU operations on 8bits take no more clock cycle (e.g XOR A, A taking 1m cycles)

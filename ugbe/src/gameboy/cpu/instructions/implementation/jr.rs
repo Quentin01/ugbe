@@ -10,16 +10,16 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Jr<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = i8> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     phantom: PhantomData<(Cond, Op)>,
 }
 
 impl<Cond, Op> Jr<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = i8> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -30,8 +30,8 @@ where
 
 impl<Cond, Op> Instruction for Jr<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = i8> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         if Cond::STR.len() == 0 {
@@ -48,19 +48,19 @@ where
 
 enum JrExecution<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = i8> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     Start(PhantomData<(Cond, Op)>),
-    ReadingOffset(Box<dyn OperandReadExecution<Op::Value>>),
+    ReadingOffset(Box<dyn OperandReadExecution<Op::Value> + 'static>),
     SettingNewAddress(i8),
     Complete,
 }
 
 impl<Cond, Op> InstructionExecution for JrExecution<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = i8> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

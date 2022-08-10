@@ -10,16 +10,16 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Call<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     phantom: PhantomData<(Cond, Op)>,
 }
 
 impl<Cond, Op> Call<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -30,8 +30,8 @@ where
 
 impl<Cond, Op> Instruction for Call<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         if Cond::STR.len() == 0 {
@@ -48,11 +48,11 @@ where
 
 enum CallExecution<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     Start(PhantomData<(Cond, Op)>),
-    ReadingAddress(Box<dyn OperandReadExecution<Op::Value>>),
+    ReadingAddress(Box<dyn OperandReadExecution<Op::Value> + 'static>),
     DecrementingSP(u16),
     PushingMsbPC(u16),
     PushingLsbPC(u16),
@@ -62,8 +62,8 @@ where
 
 impl<Cond, Op> InstructionExecution for CallExecution<Cond, Op>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

@@ -9,14 +9,14 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Ret<Cond, const ENABLE_INTERRUPT: bool = false>
 where
-    Cond: Condition + 'static,
+    Cond: Condition + Send + Sync + 'static,
 {
     phantom: PhantomData<Cond>,
 }
 
 impl<Cond, const ENABLE_INTERRUPT: bool> Ret<Cond, ENABLE_INTERRUPT>
 where
-    Cond: Condition + 'static,
+    Cond: Condition + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -27,7 +27,7 @@ where
 
 impl<Cond, const ENABLE_INTERRUPT: bool> Instruction for Ret<Cond, ENABLE_INTERRUPT>
 where
-    Cond: Condition + 'static,
+    Cond: Condition + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         if Cond::STR.len() == 0 {
@@ -44,7 +44,7 @@ where
 
 enum RetExecution<Cond, const ENABLE_INTERRUPT: bool = false>
 where
-    Cond: Condition + 'static,
+    Cond: Condition + Send + Sync + 'static,
 {
     Start(PhantomData<Cond>),
     WaitingOneCycle,
@@ -58,7 +58,7 @@ where
 impl<Cond, const ENABLE_INTERRUPT: bool> InstructionExecution
     for RetExecution<Cond, ENABLE_INTERRUPT>
 where
-    Cond: Condition + 'static,
+    Cond: Condition + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

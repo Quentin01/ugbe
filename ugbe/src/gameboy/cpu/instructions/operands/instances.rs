@@ -28,7 +28,7 @@ macro_rules! define_immediate {
 
             impl OperandIn for [<Imm $size>]
             {
-                fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+                fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
                     Box::new(ReadImmediate::<Self>::Start(PhantomData))
                 }
             }
@@ -63,7 +63,7 @@ macro_rules! define_offset {
 
             impl OperandIn for [<Off $size>]
             {
-                fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+                fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
                     Box::new(ReadImmediate::<Self>::Start(PhantomData))
                 }
             }
@@ -99,14 +99,14 @@ macro_rules! define_register_8 {
 
             impl OperandIn for [<$reg:upper>]
             {
-                fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+                fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
                     Box::new(ReadRegister::<Self>::new())
                 }
             }
 
             impl OperandOut for [<$reg:upper>]
             {
-                fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution> {
+                fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution + 'static> {
                     Box::new(WriteRegister::<Self>::new(value))
                 }
             }
@@ -150,14 +150,14 @@ macro_rules! define_register_16 {
 
             impl OperandIn for [<$reg:upper>]
             {
-                fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+                fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
                     Box::new(ReadRegister::<Self>::new())
                 }
             }
 
             impl OperandOut for [<$reg:upper>]
             {
-                fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution> {
+                fn write_value(value: Self::Value) -> Box<dyn OperandWriteExecution + 'static> {
                     Box::new(WriteRegister::<Self>::new(value))
                 }
             }
@@ -191,7 +191,7 @@ impl Operand for SPPlusOff8 {
 }
 
 impl OperandIn for SPPlusOff8 {
-    fn read_value() -> Box<dyn OperandReadExecution<Self::Value>> {
+    fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static> {
         Box::new(ReadR16PlusOff8::<SP, Off8>::Start(PhantomData))
     }
 }

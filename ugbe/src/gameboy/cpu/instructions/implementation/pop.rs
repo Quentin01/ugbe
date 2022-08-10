@@ -11,14 +11,14 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Pop<Op>
 where
-    Op: Operand<Value = u16> + OperandOut + 'static,
+    Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,
 {
     phantom: PhantomData<Op>,
 }
 
 impl<Op> Pop<Op>
 where
-    Op: Operand<Value = u16> + OperandOut + 'static,
+    Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -29,7 +29,7 @@ where
 
 impl<Op> Instruction for Pop<Op>
 where
-    Op: Operand<Value = u16> + OperandOut + 'static,
+    Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("POP {}", Op::str()).into()
@@ -42,19 +42,19 @@ where
 
 enum PopExecution<Op>
 where
-    Op: Operand<Value = u16> + OperandOut + 'static,
+    Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,
 {
     Start(PhantomData<Op>),
     PopingLsb,
     PopingMsb,
     PoppingEnd(u8),
-    WritingValue(Box<dyn OperandWriteExecution>),
+    WritingValue(Box<dyn OperandWriteExecution + 'static>),
     Complete,
 }
 
 impl<Op> InstructionExecution for PopExecution<Op>
 where
-    Op: Operand<Value = u16> + OperandOut + 'static,
+    Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

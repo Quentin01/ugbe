@@ -12,16 +12,16 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Ld<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + Send + Sync + 'static,
 {
     phantom: PhantomData<(Dst, Src)>,
 }
 
 impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> Ld<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
-    Src: Operand + OperandIn,
-    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -32,8 +32,8 @@ where
 
 impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> Instruction for Ld<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("LD {}, {}", Dst::str(), Src::str()).into()
@@ -48,20 +48,20 @@ where
 
 enum LdExecution<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + Send + Sync + 'static,
 {
     Start(PhantomData<(Dst, Src)>),
-    ReadingFromSrc(Box<dyn OperandReadExecution<Src::Value>>),
-    WritingToDst(Box<dyn OperandWriteExecution>),
+    ReadingFromSrc(Box<dyn OperandReadExecution<Src::Value> + 'static>),
+    WritingToDst(Box<dyn OperandWriteExecution + 'static>),
     Complete,
 }
 
 impl<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool> InstructionExecution
     for LdExecution<Dst, Src, WAIT_ONE_EXTRA_CYCLE>
 where
-    Src: Operand + OperandIn + 'static,
-    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + 'static,
+    Src: Operand + OperandIn + Send + Sync + 'static,
+    Dst: Operand<Value = <Src as Operand>::Value> + OperandOut + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

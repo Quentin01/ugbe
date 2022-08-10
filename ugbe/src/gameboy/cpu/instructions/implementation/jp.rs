@@ -10,16 +10,16 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Jp<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool = true>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     phantom: PhantomData<(Cond, Op)>,
 }
 
 impl<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool> Jp<Cond, Op, WAIT_ONE_EXTRA_CYCLE>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -30,8 +30,8 @@ where
 
 impl<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool> Instruction for Jp<Cond, Op, WAIT_ONE_EXTRA_CYCLE>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         if Cond::STR.len() == 0 {
@@ -50,11 +50,11 @@ where
 
 enum JpExecution<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     Start(PhantomData<(Cond, Op)>),
-    ReadingOffset(Box<dyn OperandReadExecution<Op::Value>>),
+    ReadingOffset(Box<dyn OperandReadExecution<Op::Value> + 'static>),
     SettingPC(u16),
     Complete,
 }
@@ -62,8 +62,8 @@ where
 impl<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool> InstructionExecution
     for JpExecution<Cond, Op, WAIT_ONE_EXTRA_CYCLE>
 where
-    Cond: Condition + 'static,
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Cond: Condition + Send + Sync + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

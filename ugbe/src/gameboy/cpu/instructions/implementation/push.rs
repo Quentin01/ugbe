@@ -9,14 +9,14 @@ use super::super::{Instruction, InstructionExecution, InstructionExecutionState}
 
 pub struct Push<Op>
 where
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     phantom: PhantomData<Op>,
 }
 
 impl<Op> Push<Op>
 where
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
         Self {
@@ -27,7 +27,7 @@ where
 
 impl<Op> Instruction for Push<Op>
 where
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
         format!("PUSH {}", Op::str()).into()
@@ -40,10 +40,10 @@ where
 
 enum PushExecution<Op>
 where
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     Start(PhantomData<Op>),
-    ReadingValue(Box<dyn OperandReadExecution<Op::Value>>),
+    ReadingValue(Box<dyn OperandReadExecution<Op::Value> + 'static>),
     DecrementingSP([u8; 2]),
     PushingMsb([u8; 2]),
     PushingLsb([u8; 2]),
@@ -52,7 +52,7 @@ where
 
 impl<Op> InstructionExecution for PushExecution<Op>
 where
-    Op: Operand<Value = u16> + OperandIn + 'static,
+    Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {

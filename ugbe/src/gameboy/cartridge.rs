@@ -2,7 +2,7 @@ mod mbc;
 
 pub struct Cartridge {
     cartridge: crate::cartridge::Cartridge,
-    mbc: Box<dyn mbc::Mbc>,
+    mbc: Box<dyn mbc::Mbc + Send + Sync + 'static>,
 }
 
 impl std::fmt::Debug for Cartridge {
