@@ -1,3 +1,5 @@
+extern crate anyhow;
+extern crate crossbeam_channel;
 extern crate sdl2;
 
 use anyhow::{Context, Result};
@@ -26,6 +28,16 @@ impl std::fmt::Display for SdlError {
 }
 
 impl std::error::Error for SdlError {}
+
+enum ExternalGameboyEvent {
+    Stop,
+    Keyup(gameboy::joypad::Button),
+    Keydown(gameboy::joypad::Button),
+}
+
+enum InternalGameboyEvent {
+    VBlank([u8; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize]),
+}
 
 fn main() -> Result<()> {
     let boot_rom = bootrom::BootRom::from_path(BOOT_ROM_PATH)
@@ -77,6 +89,7 @@ fn main() -> Result<()> {
 
     let mut canvas = window
         .into_canvas()
+        .present_vsync()
         .build()
         .context("unable to init SDL2 canvas")?;
 
@@ -98,14 +111,19 @@ fn main() -> Result<()> {
         .map_err(SdlError)
         .context("unable to init SDL2 event pump")?;
 
-    let mut gameboy = gameboy::GameboyBuilder::new(boot_rom, cartridge)
+    let mut texture_data = [0; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize];
+
+    let (sender_internal, receiver_internal) = crossbeam_channel::unbounded();
+    let (sender_external, receiver_external) = crossbeam_channel::unbounded();
+
+    let gameboy = gameboy::GameboyBuilder::new(boot_rom, cartridge)
         .set_screen_color_grayscale()
         .set_screen_frame_blending(None)
         .build();
 
-    let mut lag_duration = std::time::Duration::new(0, 0);
+    let emulation_thread =
+        { std::thread::spawn(|| run_emulation(gameboy, sender_internal, receiver_external)) };
 
-    let mut before_frame = std::time::Instant::now();
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
@@ -113,7 +131,10 @@ fn main() -> Result<()> {
                 | sdl2::event::Event::KeyDown {
                     keycode: Some(sdl2::keyboard::Keycode::Escape),
                     ..
-                } => break 'running,
+                } => {
+                    sender_external.send(ExternalGameboyEvent::Stop)?;
+                    break 'running;
+                }
                 sdl2::event::Event::ControllerDeviceAdded { which, .. } => {
                     if let Ok(controller) = game_controller_subsystem.open(which) {
                         println!("Successfully added controller '{}'", controller.name());
@@ -139,67 +160,109 @@ fn main() -> Result<()> {
                     }
                 }
                 sdl2::event::Event::ControllerButtonUp { button, .. } => match button {
-                    sdl2::controller::Button::A => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::A)
-                    }
-                    sdl2::controller::Button::B => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::B)
-                    }
-                    sdl2::controller::Button::Start => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Start)
-                    }
-                    sdl2::controller::Button::Back => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Select)
-                    }
-                    sdl2::controller::Button::DPadUp => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Up)
-                    }
-                    sdl2::controller::Button::DPadDown => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Down)
-                    }
-                    sdl2::controller::Button::DPadLeft => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Left)
-                    }
-                    sdl2::controller::Button::DPadRight => {
-                        gameboy.joypad().keyup(gameboy::joypad::Button::Right)
-                    }
+                    sdl2::controller::Button::A => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::A))?,
+                    sdl2::controller::Button::B => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::B))?,
+                    sdl2::controller::Button::Start => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Start))?,
+                    sdl2::controller::Button::Back => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Select))?,
+                    sdl2::controller::Button::DPadUp => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Up))?,
+                    sdl2::controller::Button::DPadDown => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Down))?,
+                    sdl2::controller::Button::DPadLeft => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Left))?,
+                    sdl2::controller::Button::DPadRight => sender_external
+                        .send(ExternalGameboyEvent::Keyup(gameboy::joypad::Button::Right))?,
                     _ => {}
                 },
                 sdl2::event::Event::ControllerButtonDown { button, .. } => match button {
-                    sdl2::controller::Button::A => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::A)
-                    }
-                    sdl2::controller::Button::B => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::B)
-                    }
-                    sdl2::controller::Button::Start => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Start)
-                    }
-                    sdl2::controller::Button::Back => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Select)
-                    }
-                    sdl2::controller::Button::DPadUp => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Up)
-                    }
-                    sdl2::controller::Button::DPadDown => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Down)
-                    }
-                    sdl2::controller::Button::DPadLeft => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Left)
-                    }
-                    sdl2::controller::Button::DPadRight => {
-                        gameboy.joypad().keydown(gameboy::joypad::Button::Right)
-                    }
+                    sdl2::controller::Button::A => sender_external
+                        .send(ExternalGameboyEvent::Keydown(gameboy::joypad::Button::A))?,
+                    sdl2::controller::Button::B => sender_external
+                        .send(ExternalGameboyEvent::Keydown(gameboy::joypad::Button::B))?,
+                    sdl2::controller::Button::Start => sender_external.send(
+                        ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Start),
+                    )?,
+                    sdl2::controller::Button::Back => sender_external.send(
+                        ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Select),
+                    )?,
+                    sdl2::controller::Button::DPadUp => sender_external
+                        .send(ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Up))?,
+                    sdl2::controller::Button::DPadDown => sender_external
+                        .send(ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Down))?,
+                    sdl2::controller::Button::DPadLeft => sender_external
+                        .send(ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Left))?,
+                    sdl2::controller::Button::DPadRight => sender_external.send(
+                        ExternalGameboyEvent::Keydown(gameboy::joypad::Button::Right),
+                    )?,
                     _ => {}
                 },
                 _ => {}
             }
         }
 
-        // Running the emulation until a LCDOff or a VBlank
-        let (run_duration, expected_frame_duration) = {
-            let before_run = std::time::Instant::now();
+        // Wait for VBlank from the emulation
+        {
+            let mut vblank = false;
+            for event in receiver_internal.try_iter() {
+                match event {
+                    InternalGameboyEvent::VBlank(frame_data) => {
+                        vblank = true;
+                        texture_data = frame_data;
+                    }
+                }
+            }
+
+            if !vblank {
+                continue;
+            }
+        }
+
+        // Update the canvas with the pixels from the gameboy screen
+        {
+            texture
+                .update(None, &texture_data, TEXTURE_PITCH)
+                .context("unable to update SDL2 texture")?;
+            canvas
+                .copy(&texture, None, None)
+                .map_err(SdlError)
+                .context("unable to copy the SDL2 texture inside the SDL2 canvas")?;
+        };
+
+        // Present the texture on the screen
+        canvas.present();
+    }
+
+    emulation_thread.join().expect("unable to join the thread");
+
+    Ok(())
+}
+
+fn run_emulation(
+    mut gameboy: gameboy::Gameboy,
+    internal_events: crossbeam_channel::Sender<InternalGameboyEvent>,
+    external_events: crossbeam_channel::Receiver<ExternalGameboyEvent>,
+) {
+    let mut lag_duration = std::time::Duration::new(0, 0);
+    let mut before_frame = std::time::Instant::now();
+
+    'running: loop {
+        // Run the emulation until we need to display another frame
+        let expected_frame_duration = {
             let before_emulation = gameboy.clock().now();
+
+            // Deal with external events
+            for event in external_events.try_iter() {
+                match event {
+                    ExternalGameboyEvent::Stop => break 'running,
+                    ExternalGameboyEvent::Keyup(button) => gameboy.joypad().keyup(button),
+                    ExternalGameboyEvent::Keydown(button) => gameboy.joypad().keydown(button),
+                }
+            }
+
             loop {
                 match gameboy.tick() {
                     Some(screen_event) => match screen_event {
@@ -212,44 +275,24 @@ fn main() -> Result<()> {
                     None => {}
                 }
             }
-            (
-                before_run.elapsed(),
-                before_emulation.elapsed(gameboy.clock()),
-            )
+
+            before_emulation.elapsed(gameboy.clock())
         };
 
-        // Update the canvas with the pixels from the gameboy screen
-        let render_duration = {
-            let before_render = std::time::Instant::now();
-
-            let texture_data = unsafe {
+        // Send the new frame to the main thread
+        {
+            let frame_data = unsafe {
                 std::mem::transmute::<
-                    &[gameboy::screen::Color; (TEXTURE_WIDTH * TEXTURE_HEIGHT) as usize],
-                    &[u8; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize],
-                >(gameboy.screen().pixels())
+                    [gameboy::screen::Color; (TEXTURE_WIDTH * TEXTURE_HEIGHT) as usize],
+                    [u8; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize],
+                >(*gameboy.screen().pixels())
             };
 
-            texture
-                .update(None, texture_data, TEXTURE_PITCH)
-                .context("unable to update SDL2 texture")?;
-            canvas
-                .copy(&texture, None, None)
-                .map_err(SdlError)
-                .context("unable to copy the SDL2 texture inside the SDL2 canvas")?;
+            internal_events
+                .send(InternalGameboyEvent::VBlank(frame_data))
+                .expect("Couldn't send VBlank");
+        }
 
-            before_render.elapsed()
-        };
-
-        // Present the texture on the screen
-        let present_duration = {
-            let before_present = std::time::Instant::now();
-
-            canvas.present();
-
-            before_present.elapsed()
-        };
-
-        // Fix the framing time by sleeping if necessary
         let frame_duration = before_frame.elapsed();
 
         if frame_duration + lag_duration < expected_frame_duration {
@@ -257,15 +300,12 @@ fn main() -> Result<()> {
         } else if frame_duration > expected_frame_duration {
             #[cfg(debug_assertions)]
             println!(
-                "Warning: A frame took more time than expected (frame={:?} / run={:?} / render={:?} / present={:?} / expected={:?} / lag={:?})",
-                frame_duration, run_duration, render_duration, present_duration,
-                expected_frame_duration, lag_duration
+                "Warning: A frame took more time than expected (frame={:?} / expected={:?} / lag={:?})",
+                frame_duration, expected_frame_duration, lag_duration
             );
         }
 
         lag_duration = before_frame.elapsed() + lag_duration - expected_frame_duration;
         before_frame = std::time::Instant::now();
     }
-
-    Ok(())
 }
