@@ -1,25 +1,13 @@
-use std::{fmt::Debug, ops::Index};
+use std::fmt::Debug;
 
 use super::components::{InterruptKind, InterruptLine};
 
+mod color;
 mod fetcher;
 mod fifo;
 mod registers;
 pub mod screen;
 mod tiling;
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct ColorId {
-    msb: bool,
-    lsb: bool,
-}
-
-impl ColorId {
-    const ZERO: ColorId = ColorId {
-        msb: false,
-        lsb: false,
-    };
-}
 
 #[derive(Debug, Copy, Clone)]
 pub struct Sprite {
@@ -39,7 +27,7 @@ impl PartialEq for Sprite {
 impl Eq for Sprite {}
 
 impl Sprite {
-    fn palette(&self, ppu: &Ppu) -> Palette {
+    fn palette(&self, ppu: &Ppu) -> color::Palette {
         if self.attr & (1 << 4) == 0 {
             ppu.obp0
         } else {
@@ -57,36 +45,6 @@ impl Sprite {
 
     fn over_bg_and_win(&self) -> bool {
         self.attr & (1 << 7) == 0
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Palette(u8);
-
-impl From<u8> for Palette {
-    fn from(value: u8) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Palette> for u8 {
-    fn from(palette: Palette) -> Self {
-        palette.0
-    }
-}
-
-impl Index<ColorId> for Palette {
-    type Output = screen::Color;
-
-    fn index(&self, index: ColorId) -> &Self::Output {
-        let index = (index.msb as usize) << 1 | (index.lsb as usize);
-        match (self.0 >> (index * 2)) & 0b11 {
-            0 => &screen::Color::White,
-            1 => &screen::Color::LightGray,
-            2 => &screen::Color::DarkGray,
-            3 => &screen::Color::Black,
-            _ => unreachable!(),
-        }
     }
 }
 
@@ -374,9 +332,7 @@ impl Mode {
                             bg_pixel.color()
                         };
 
-                        if !ppu.skip_frame {
-                            ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
-                        }
+                        ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
 
                         lx = lx.wrapping_add(1)
                     }
@@ -556,7 +512,11 @@ impl Mode {
             interrupt_line.request(InterruptKind::Stat);
         }
 
-        ppu.skip_frame = false;
+        if ppu.skip_frame {
+            ppu.skip_frame = false;
+        } else {
+            ppu.screen.commit_frame()
+        }
 
         ppu.ly += 1;
         ppu.check_lyc_compare(interrupt_line);
@@ -613,9 +573,9 @@ pub struct Ppu {
     lyc: u8,
     wy: u8,
     wx: u8,
-    bgp: Palette,
-    obp0: Palette,
-    obp1: Palette,
+    bgp: color::Palette,
+    obp0: color::Palette,
+    obp1: color::Palette,
     mode: Mode,
     vram: [u8; 0x2000],
     oam: [u8; 0x100],
@@ -636,7 +596,7 @@ impl Debug for Ppu {
 }
 
 impl Ppu {
-    pub fn new() -> Self {
+    pub fn new(screen_config: screen::Config) -> Self {
         Self {
             skip_frame: false,
             lcdc: 0.into(),
@@ -654,7 +614,7 @@ impl Ppu {
             mode: Mode::default(),
             vram: [0x0; 0x2000],
             oam: [0x0; 0x100],
-            screen: screen::Screen::default(),
+            screen: screen::Screen::new(screen_config),
             ldc_event: None,
         }
     }

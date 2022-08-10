@@ -15,6 +15,7 @@ pub use ppu::screen;
 pub struct GameboyBuilder {
     boot_rom: crate::bootrom::BootRom,
     cartridge: crate::cartridge::Cartridge,
+    screen_config: screen::Config,
 }
 
 impl GameboyBuilder {
@@ -24,7 +25,29 @@ impl GameboyBuilder {
         Self {
             boot_rom,
             cartridge,
+            screen_config: screen::Config::default(),
         }
+    }
+
+    pub fn set_screen_config(self, screen_config: screen::Config) -> Self {
+        Self {
+            screen_config,
+            ..self
+        }
+    }
+
+    pub fn set_screen_frame_blending(
+        mut self,
+        frame_blending: Option<screen::FrameBlending>,
+    ) -> Self {
+        self.screen_config.set_frame_blending(frame_blending);
+        self
+    }
+
+    pub fn set_screen_color_grayscale(mut self) -> Self {
+        self.screen_config
+            .set_color_palette(screen::ColorPalette::new_grayscale());
+        self
     }
 
     pub fn build(self) -> Gameboy {
@@ -33,7 +56,7 @@ impl GameboyBuilder {
             boot_rom: self.boot_rom,
             cartridge: self.cartridge.into(),
             joypad: joypad::Joypad::new(),
-            ppu: ppu::Ppu::new(),
+            ppu: ppu::Ppu::new(self.screen_config),
             cpu: cpu::Cpu::new(),
             bus: bus::Bus::new(),
             interrupt: interrupt::Interrupt::new(),

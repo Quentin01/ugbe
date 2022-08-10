@@ -7,14 +7,13 @@ use ugbe::{bootrom, cartridge, gameboy};
 const BOOT_ROM_PATH: &str = "/home/quentin/git/ugbe/roms/boot.gb";
 const ROM_PATH: &str = "/home/quentin/git/ugbe/roms/ZeldaLinksAwakeningDX.gb";
 
-const PIXEL_SCALE: usize = 4;
-const FRAMES_TO_BLEND: usize = 1;
+const PIXEL_SCALE: u32 = 4;
 
-const TEXTURE_FORMAT: sdl2::pixels::PixelFormatEnum = sdl2::pixels::PixelFormatEnum::RGB24;
-const BYTES_PER_PIXEL: u32 = 3;
+const TEXTURE_FORMAT: sdl2::pixels::PixelFormatEnum = sdl2::pixels::PixelFormatEnum::RGB555;
+const BYTES_PER_PIXEL: u32 = 2;
 
-const TEXTURE_WIDTH: u32 = (gameboy::screen::Screen::WIDTH * PIXEL_SCALE) as u32;
-const TEXTURE_HEIGHT: u32 = (gameboy::screen::Screen::HEIGHT * PIXEL_SCALE) as u32;
+const TEXTURE_WIDTH: u32 = gameboy::screen::Screen::WIDTH as u32;
+const TEXTURE_HEIGHT: u32 = gameboy::screen::Screen::HEIGHT as u32;
 const TEXTURE_PITCH: usize = (TEXTURE_WIDTH * BYTES_PER_PIXEL) as usize;
 
 #[derive(Debug)]
@@ -69,32 +68,29 @@ fn main() -> Result<()> {
     let window = video_subsystem
         .window(
             &format!("UGBE - {}", cartridge.header().title),
-            TEXTURE_WIDTH,
-            TEXTURE_HEIGHT,
+            TEXTURE_WIDTH * PIXEL_SCALE,
+            TEXTURE_HEIGHT * PIXEL_SCALE,
         )
         .position_centered()
         .build()
         .context("unable to init SDL2 window")?;
-
-    let mut texture_data = [0; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize];
 
     let mut canvas = window
         .into_canvas()
         .build()
         .context("unable to init SDL2 canvas")?;
 
+    canvas
+        .set_integer_scale(true)
+        .map_err(SdlError)
+        .context("unable to enable integer scaling")?;
+
     let texture_creator = canvas.texture_creator();
     let mut texture = texture_creator
         .create_texture_target(TEXTURE_FORMAT, TEXTURE_WIDTH, TEXTURE_HEIGHT)
         .context("unable to init SDL2 texture")?;
 
-    texture
-        .update(None, &texture_data, TEXTURE_PITCH)
-        .context("unable to update SDL2 texture")?;
-    canvas
-        .copy(&texture, None, None)
-        .map_err(SdlError)
-        .context("unable to copy SDL2 texture inside the SDL2 canvas")?;
+    canvas.clear();
     canvas.present();
 
     let mut event_pump = sdl_context
@@ -102,12 +98,10 @@ fn main() -> Result<()> {
         .map_err(SdlError)
         .context("unable to init SDL2 event pump")?;
 
-    let mut gameboy = gameboy::GameboyBuilder::new(boot_rom, cartridge).build();
-
-    let mut idx_frame = 0;
-    let mut frames = [[sdl2::pixels::Color::RGB(255, 255, 255);
-        gameboy::screen::Screen::WIDTH * gameboy::screen::Screen::HEIGHT];
-        FRAMES_TO_BLEND];
+    let mut gameboy = gameboy::GameboyBuilder::new(boot_rom, cartridge)
+        .set_screen_color_grayscale()
+        .set_screen_frame_blending(None)
+        .build();
 
     let mut lag_duration = std::time::Duration::new(0, 0);
 
@@ -224,79 +218,25 @@ fn main() -> Result<()> {
             )
         };
 
-        // Update the texture with the pixels from the gameboy screen
+        // Update the canvas with the pixels from the gameboy screen
         let render_duration = {
             let before_render = std::time::Instant::now();
 
-            // Add the frame in the list of frames
-            let pixels = gameboy.screen().pixels();
-            for x in 0..gameboy::screen::Screen::WIDTH {
-                for y in 0..gameboy::screen::Screen::HEIGHT {
-                    let pixel_idx = y * gameboy::screen::Screen::WIDTH + x;
+            let texture_data = unsafe {
+                std::mem::transmute::<
+                    &[gameboy::screen::Color; (TEXTURE_WIDTH * TEXTURE_HEIGHT) as usize],
+                    &[u8; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize],
+                >(gameboy.screen().pixels())
+            };
 
-                    frames[idx_frame][pixel_idx] = match pixels[pixel_idx] {
-                        gameboy::screen::Color::Off => sdl2::pixels::Color::RGB(255, 255, 255),
-                        gameboy::screen::Color::White => sdl2::pixels::Color::RGB(255, 255, 255),
-                        gameboy::screen::Color::LightGray => {
-                            sdl2::pixels::Color::RGB(170, 170, 170)
-                        }
-                        gameboy::screen::Color::DarkGray => sdl2::pixels::Color::RGB(85, 85, 85),
-                        gameboy::screen::Color::Black => sdl2::pixels::Color::RGB(0, 0, 0),
-                    };
-                }
-            }
+            texture
+                .update(None, texture_data, TEXTURE_PITCH)
+                .context("unable to update SDL2 texture")?;
+            canvas
+                .copy(&texture, None, None)
+                .map_err(SdlError)
+                .context("unable to copy the SDL2 texture inside the SDL2 canvas")?;
 
-            // Change the texture with a blending of all the frames
-            for x in 0..gameboy::screen::Screen::WIDTH {
-                for y in 0..gameboy::screen::Screen::HEIGHT {
-                    let color = {
-                        let mut red: f64 = 0.0;
-                        let mut green: f64 = 0.0;
-                        let mut blue: f64 = 0.0;
-
-                        let mut total_coeff = 0.0;
-
-                        // Go from frame to frames from the older one first
-                        for offset in (0..FRAMES_TO_BLEND).rev() {
-                            let idx = (idx_frame + offset) % FRAMES_TO_BLEND;
-
-                            // More recent frames have less influence on the frame
-                            let coeff = 1.0
-                                - ((FRAMES_TO_BLEND - offset - 1) as f64
-                                    * (1.0 / FRAMES_TO_BLEND as f64));
-                            total_coeff += coeff;
-
-                            red += frames[idx][y * gameboy::screen::Screen::WIDTH + x].r as f64
-                                * coeff;
-                            green += frames[idx][y * gameboy::screen::Screen::WIDTH + x].g as f64
-                                * coeff;
-                            blue += frames[idx][y * gameboy::screen::Screen::WIDTH + x].b as f64
-                                * coeff;
-                        }
-
-                        sdl2::pixels::Color::RGB(
-                            (red / total_coeff) as u8,
-                            (green / total_coeff) as u8,
-                            (blue / total_coeff) as u8,
-                        )
-                    };
-
-                    for x_zoom in 0..PIXEL_SCALE {
-                        let x = x * PIXEL_SCALE + x_zoom;
-                        for y_zoom in 0..PIXEL_SCALE {
-                            let y = y * PIXEL_SCALE + y_zoom;
-
-                            let base_idx = y * TEXTURE_PITCH + x * 3;
-
-                            texture_data[base_idx] = color.r;
-                            texture_data[base_idx + 1] = color.g;
-                            texture_data[base_idx + 2] = color.b;
-                        }
-                    }
-                }
-            }
-
-            idx_frame = (idx_frame + 1) % FRAMES_TO_BLEND;
             before_render.elapsed()
         };
 
@@ -304,13 +244,6 @@ fn main() -> Result<()> {
         let present_duration = {
             let before_present = std::time::Instant::now();
 
-            texture
-                .update(None, &texture_data, TEXTURE_PITCH)
-                .context("unable to update SDL2 texture")?;
-            canvas
-                .copy(&texture, None, None)
-                .map_err(SdlError)
-                .context("unable to copy the SDL2 texture inside the SDL2 canvas")?;
             canvas.present();
 
             before_present.elapsed()

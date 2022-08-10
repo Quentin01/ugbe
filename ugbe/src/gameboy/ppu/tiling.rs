@@ -204,17 +204,14 @@ impl TileDataMap {
 pub fn tile_pixel_row(
     high_row_data: TileHighRowData,
     low_row_data: TileLowRowData,
-) -> [super::ColorId; 8] {
-    let mut pixel_row = [super::ColorId {
-        msb: false,
-        lsb: false,
-    }; 8];
+) -> [super::color::Id; 8] {
+    let mut pixel_row = [super::color::Id::ZERO; 8];
 
     for i in 0..8 {
-        pixel_row[7 - i] = super::ColorId {
-            msb: (high_row_data.0 >> i) & 0x1 == 0x1,
-            lsb: (low_row_data.0 >> i) & 0x1 == 0x1,
-        };
+        pixel_row[7 - i] = super::color::Id::new(
+            (high_row_data.0 >> i) & 0x1 == 0x1,
+            (low_row_data.0 >> i) & 0x1 == 0x1,
+        );
     }
 
     pixel_row

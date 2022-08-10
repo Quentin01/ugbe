@@ -21,12 +21,12 @@ pub enum FetcherState {
 
 #[derive(Debug, Copy, Clone)]
 pub struct BackgroundWindowPixel {
-    color_id: super::ColorId,
-    palette: super::Palette,
+    color_id: super::color::Id,
+    palette: super::color::Palette,
 }
 
 impl BackgroundWindowPixel {
-    fn new(ppu: &super::Ppu, color_id: super::ColorId) -> Self {
+    fn new(ppu: &super::Ppu, color_id: super::color::Id) -> Self {
         BackgroundWindowPixel {
             color_id,
             palette: ppu.bgp,
@@ -34,10 +34,10 @@ impl BackgroundWindowPixel {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.color_id == super::ColorId::ZERO
+        self.color_id == super::color::Id::ZERO
     }
 
-    pub fn color(&self) -> super::screen::Color {
+    pub fn color(&self) -> super::color::Color {
         self.palette[self.color_id]
     }
 }
@@ -152,7 +152,7 @@ impl BackgroundWindowFetcher {
                         if ppu.lcdc.display_bg() {
                             fifo.push(BackgroundWindowPixel::new(ppu, pixel_color_id));
                         } else {
-                            fifo.push(BackgroundWindowPixel::new(ppu, super::ColorId::ZERO));
+                            fifo.push(BackgroundWindowPixel::new(ppu, super::color::Id::ZERO));
                         }
                     }
 
@@ -170,23 +170,23 @@ impl BackgroundWindowFetcher {
 #[derive(Debug, Copy, Clone)]
 pub struct SpritePixel {
     sprite: super::Sprite,
-    color_id: super::ColorId,
+    color_id: super::color::Id,
 }
 
 impl SpritePixel {
-    fn new(sprite: super::Sprite, color_id: super::ColorId) -> Self {
+    fn new(sprite: super::Sprite, color_id: super::color::Id) -> Self {
         SpritePixel { sprite, color_id }
     }
 
     pub fn is_zero(&self) -> bool {
-        self.color_id == super::ColorId::ZERO
+        self.color_id == super::color::Id::ZERO
     }
 
     pub fn over_bg_and_win(&self) -> bool {
         self.sprite.over_bg_and_win()
     }
 
-    pub fn color(&self, ppu: &super::Ppu) -> super::screen::Color {
+    pub fn color(&self, ppu: &super::Ppu) -> super::color::Color {
         self.sprite.palette(ppu)[self.color_id]
     }
 }
@@ -293,16 +293,16 @@ impl SpriteFetcher {
                 let mut pixel_row_normal_it;
                 let mut pixel_row_rev_it;
 
-                let pixel_row_it: &mut dyn Iterator<Item = super::ColorId> = if self.sprite.x_flip()
-                {
-                    let x_offset = (lx + 8 - self.sprite.x) as usize;
-                    pixel_row_rev_it = pixel_row.into_iter().skip(x_offset).rev();
-                    &mut pixel_row_rev_it
-                } else {
-                    let x_offset = (lx + 8 - self.sprite.x) as usize;
-                    pixel_row_normal_it = pixel_row.into_iter().skip(x_offset);
-                    &mut pixel_row_normal_it
-                };
+                let pixel_row_it: &mut dyn Iterator<Item = super::color::Id> =
+                    if self.sprite.x_flip() {
+                        let x_offset = (lx + 8 - self.sprite.x) as usize;
+                        pixel_row_rev_it = pixel_row.into_iter().skip(x_offset).rev();
+                        &mut pixel_row_rev_it
+                    } else {
+                        let x_offset = (lx + 8 - self.sprite.x) as usize;
+                        pixel_row_normal_it = pixel_row.into_iter().skip(x_offset);
+                        &mut pixel_row_normal_it
+                    };
 
                 for (idx, pixel_color_id) in pixel_row_it.enumerate() {
                     let pixel = SpritePixel::new(self.sprite, pixel_color_id);
