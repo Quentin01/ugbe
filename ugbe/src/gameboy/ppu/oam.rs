@@ -44,11 +44,11 @@ impl Sprite {
         self.tile_no
     }
 
-    pub fn palette(&self, ppu: &super::Ppu) -> super::color::Palette {
+    pub fn palette(&self, ppu_ctx: &super::Context) -> super::color::Palette {
         if self.attr & (1 << 4) == 0 {
-            ppu.obp0
+            ppu_ctx.obp0
         } else {
-            ppu.obp1
+            ppu_ctx.obp1
         }
     }
 

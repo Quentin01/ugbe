@@ -61,19 +61,19 @@ impl Default for Mode {
 
 impl Mode {
     fn execute(
-        self,
-        ppu: &mut Ppu,
+        &mut self,
+        ppu_ctx: &mut Context,
         interrupt_line: &mut dyn InterruptLine,
-    ) -> (Self, Option<screen::Event>) {
+    ) -> Option<screen::Event> {
         // If the LCD is OFF, we don't have to do anything
-        if !ppu.lcdc.lcd_enabled() {
-            return (self, None);
+        if !ppu_ctx.lcdc.lcd_enabled() {
+            return None;
         }
 
         match self {
-            Mode::OAMScan {
-                mut sprite_buffer,
-                mut sprite_buffer_idx,
+            Self::OAMScan {
+                sprite_buffer,
+                sprite_buffer_idx,
                 wy_match_ly,
                 sprite_no,
                 current_sprite,
@@ -83,111 +83,90 @@ impl Mode {
                 match current_sprite {
                     None => {
                         // During even T-cycles we will just fetch the sprite
-                        let sprite = ppu.oam.sprite(sprite_no);
+                        let sprite = ppu_ctx.oam.sprite(*sprite_no);
 
-                        (
-                            Mode::OAMScan {
-                                sprite_buffer,
-                                sprite_buffer_idx,
-                                wy_match_ly: if ppu.wy == ppu.ly { true } else { wy_match_ly },
-                                sprite_no: sprite_no.wrapping_inc(),
-                                current_sprite: Some(sprite),
-                                win_ly,
-                            },
-                            None,
-                        )
+                        if ppu_ctx.wy == ppu_ctx.ly {
+                            *wy_match_ly = true;
+                        }
+
+                        *sprite_no = sprite_no.wrapping_inc();
+                        *current_sprite = Some(sprite);
+
+                        None
                     }
-                    Some(current_sprite) => {
+                    Some(sprite) => {
                         // During odd T-cycles we are checking if the sprite should be added to the sprite buffer
-                        if sprite_buffer_idx >= 10 {
-                            if sprite_no >= oam::SpriteNo::last() {
-                                return (
-                                    Mode::switch_from_oam_scan_to_drawing(
-                                        ppu,
-                                        sprite_buffer,
-                                        wy_match_ly,
-                                        win_ly,
-                                    ),
-                                    None,
+                        if *sprite_buffer_idx >= 10 {
+                            if *sprite_no >= oam::SpriteNo::last() {
+                                *self = Self::switch_from_oam_scan_to_drawing(
+                                    ppu_ctx,
+                                    *sprite_buffer,
+                                    *wy_match_ly,
+                                    *win_ly,
                                 );
+
+                                return None;
                             } else {
-                                return (
-                                    Mode::OAMScan {
-                                        sprite_buffer,
-                                        sprite_buffer_idx,
-                                        wy_match_ly,
-                                        sprite_no,
-                                        current_sprite: None,
-                                        win_ly,
-                                    },
-                                    None,
-                                );
+                                *current_sprite = None;
+
+                                return None;
                             }
                         }
 
-                        let sprite_height = ppu.lcdc.sprite_height();
+                        let sprite_height = ppu_ctx.lcdc.sprite_height();
 
-                        let sprite_y_range_on_screen = if current_sprite.y() >= 16 {
-                            let sprite_y_on_screen = current_sprite.y() - 16;
+                        let sprite_y_range_on_screen = if sprite.y() >= 16 {
+                            let sprite_y_on_screen = sprite.y() - 16;
                             sprite_y_on_screen..(sprite_y_on_screen + sprite_height)
-                        } else if sprite_height + current_sprite.y() > 16 {
-                            0..(sprite_height + current_sprite.y() - 16)
+                        } else if sprite_height + sprite.y() > 16 {
+                            0..(sprite_height + sprite.y() - 16)
                         } else {
                             0..0
                         };
 
-                        if sprite_y_range_on_screen.contains(&ppu.ly) {
-                            sprite_buffer[sprite_buffer_idx] = Some(current_sprite);
-                            sprite_buffer_idx += 1;
+                        if sprite_y_range_on_screen.contains(&ppu_ctx.ly) {
+                            sprite_buffer[*sprite_buffer_idx] = Some(*sprite);
+                            *sprite_buffer_idx += 1;
                         }
 
-                        if sprite_no >= oam::SpriteNo::last() {
-                            (
-                                Mode::switch_from_oam_scan_to_drawing(
-                                    ppu,
-                                    sprite_buffer,
-                                    wy_match_ly,
-                                    win_ly,
-                                ),
-                                None,
-                            )
+                        if *sprite_no >= oam::SpriteNo::last() {
+                            *self = Self::switch_from_oam_scan_to_drawing(
+                                ppu_ctx,
+                                *sprite_buffer,
+                                *wy_match_ly,
+                                *win_ly,
+                            );
+
+                            None
                         } else {
-                            (
-                                Mode::OAMScan {
-                                    sprite_buffer,
-                                    sprite_buffer_idx,
-                                    wy_match_ly,
-                                    sprite_no,
-                                    current_sprite: None,
-                                    win_ly,
-                                },
-                                None,
-                            )
+                            *current_sprite = None;
+
+                            None
                         }
                     }
                 }
             }
-            Mode::Drawing {
-                mut sprite_buffer,
+            Self::Drawing {
+                sprite_buffer,
                 wy_match_ly,
-                mut scx_delay,
-                mut lx,
-                mut elapsed_cycles,
-                mut win_fetcher,
-                mut bg_win_fetcher,
-                mut bg_win_fifo,
-                mut sprite_fetcher,
-                mut sprite_fifo,
-                mut win_ly,
+                scx_delay,
+                lx,
+                elapsed_cycles,
+                win_fetcher,
+                bg_win_fetcher,
+                bg_win_fifo,
+                sprite_fetcher,
+                sprite_fifo,
+                win_ly,
             } => {
-                elapsed_cycles += 1;
+                *elapsed_cycles += 1;
 
                 if sprite_fetcher.is_none() {
                     // Fetch the sprite that could be render starting at lx
                     // For that we need to disable the warning of clippy telling us that our loop is executed only once as we don't have labelled block yet
                     #[allow(clippy::never_loop)]
                     let sprite_to_render = 'fetch_sprite_to_render: loop {
-                        if !ppu.lcdc.display_sprite() {
+                        if !ppu_ctx.lcdc.display_sprite() {
                             break 'fetch_sprite_to_render None;
                         }
 
@@ -202,7 +181,7 @@ impl Mode {
                                         None
                                     };
 
-                                    if lx_start == Some(lx) {
+                                    if lx_start == Some(*lx) {
                                         break 'fetch_sprite_to_render sprite_opt.take();
                                     }
                                 }
@@ -218,59 +197,44 @@ impl Mode {
                     match sprite_to_render {
                         Some(sprite) => {
                             bg_win_fetcher.reset();
-                            sprite_fetcher = Some(fetcher::SpriteFetcher::new(sprite, ppu));
+                            *sprite_fetcher = Some(fetcher::SpriteFetcher::new(sprite, ppu_ctx));
                         }
                         None => {}
                     }
                 }
 
-                if let Some(fetcher) = &mut sprite_fetcher {
-                    if fetcher.tick(ppu, lx, &mut sprite_fifo) {
-                        sprite_fetcher = None;
+                if let Some(fetcher) = sprite_fetcher {
+                    if fetcher.tick(ppu_ctx, *lx, sprite_fifo) {
+                        *sprite_fetcher = None;
                     }
 
-                    return (
-                        Mode::Drawing {
-                            sprite_buffer,
-                            wy_match_ly,
-                            scx_delay,
-                            lx,
-                            elapsed_cycles,
-                            win_fetcher,
-                            bg_win_fetcher,
-                            bg_win_fifo,
-                            sprite_fetcher,
-                            sprite_fifo,
-                            win_ly,
-                        },
-                        None,
-                    );
+                    return None;
                 }
 
                 // Check if we need to start fetching the window
-                if scx_delay == 0
-                    && ppu.lcdc.display_window()
-                    && wy_match_ly
-                    && lx >= ppu.wx - 7
-                    && !win_fetcher
+                if *scx_delay == 0
+                    && ppu_ctx.lcdc.display_window()
+                    && *wy_match_ly
+                    && *lx >= ppu_ctx.wx - 7
+                    && !*win_fetcher
                 {
-                    bg_win_fetcher = fetcher::BackgroundWindowFetcher::new(
-                        ppu.lcdc.window_tile_map(),
-                        tiling::PixelPosition::new(0, win_ly as usize),
+                    *bg_win_fetcher = fetcher::BackgroundWindowFetcher::new(
+                        ppu_ctx.lcdc.window_tile_map(),
+                        tiling::PixelPosition::new(0, *win_ly as usize),
                     );
 
                     bg_win_fifo.clear();
 
-                    win_fetcher = true;
-                    win_ly += 1;
+                    *win_fetcher = true;
+                    *win_ly += 1;
                 }
 
-                bg_win_fetcher.tick(ppu, &mut bg_win_fifo);
+                bg_win_fetcher.tick(ppu_ctx, bg_win_fifo);
 
                 if bg_win_fifo.len() > 0 {
-                    if scx_delay != 0 {
+                    if *scx_delay != 0 {
                         bg_win_fifo.pop();
-                        scx_delay -= 1;
+                        *scx_delay -= 1;
                     } else {
                         let bg_pixel = bg_win_fifo.pop();
 
@@ -282,136 +246,100 @@ impl Mode {
                             {
                                 bg_pixel.color()
                             } else {
-                                sprite_pixel.color(ppu)
+                                sprite_pixel.color(ppu_ctx)
                             }
                         } else {
                             bg_pixel.color()
                         };
 
-                        ppu.screen.set_pixel(lx.into(), ppu.ly.into(), pixel_color);
+                        ppu_ctx
+                            .screen
+                            .set_pixel((*lx).into(), ppu_ctx.ly.into(), pixel_color);
 
-                        lx = lx.wrapping_add(1)
+                        *lx = lx.wrapping_add(1)
                     }
                 }
 
-                if lx >= 160 {
-                    (
-                        Mode::switch_from_drawing_to_hblank(
-                            ppu,
-                            interrupt_line,
-                            elapsed_cycles,
-                            wy_match_ly,
-                            win_ly,
-                        ),
-                        None,
-                    )
+                if *lx >= 160 {
+                    *self = Self::switch_from_drawing_to_hblank(
+                        ppu_ctx,
+                        interrupt_line,
+                        *elapsed_cycles,
+                        *wy_match_ly,
+                        *win_ly,
+                    );
+
+                    None
                 } else {
-                    (
-                        Mode::Drawing {
-                            sprite_buffer,
-                            wy_match_ly,
-                            scx_delay,
-                            lx,
-                            elapsed_cycles,
-                            win_fetcher,
-                            bg_win_fetcher,
-                            bg_win_fifo,
-                            sprite_fetcher,
-                            sprite_fifo,
-                            win_ly,
-                        },
-                        None,
-                    )
+                    None
                 }
             }
-            Mode::HBlank {
-                mut elapsed_cycles,
+            Self::HBlank {
+                elapsed_cycles,
                 wy_match_ly,
                 win_ly,
             } => {
-                elapsed_cycles += 1;
+                *elapsed_cycles += 1;
 
                 // A line is 456 T-cycles but elapsed_cycles started counting after the OAM scan which have a duration of 80 T-cycles
-                if elapsed_cycles >= 456 - 80 {
-                    if ppu.ly == 143 {
-                        (
-                            Self::switch_from_hblank_to_vblank(ppu, interrupt_line),
-                            Some(screen::Event::VBlank),
-                        )
+                if *elapsed_cycles >= 456 - 80 {
+                    if ppu_ctx.ly == 143 {
+                        *self = Self::switch_from_hblank_to_vblank(ppu_ctx, interrupt_line);
+
+                        Some(screen::Event::VBlank)
                     } else {
-                        (
-                            Self::switch_from_hblank_to_oam_scan(
-                                ppu,
-                                interrupt_line,
-                                wy_match_ly,
-                                win_ly,
-                            ),
-                            None,
-                        )
+                        *self = Self::switch_from_hblank_to_oam_scan(
+                            ppu_ctx,
+                            interrupt_line,
+                            *wy_match_ly,
+                            *win_ly,
+                        );
+
+                        None
                     }
                 } else {
-                    (
-                        Mode::HBlank {
-                            elapsed_cycles,
-                            wy_match_ly,
-                            win_ly,
-                        },
-                        None,
-                    )
+                    None
                 }
             }
-            Mode::VBlank {
-                mut elapsed_cycles_line,
-                mut ly,
+            Self::VBlank {
+                elapsed_cycles_line,
+                ly,
             } => {
-                elapsed_cycles_line += 1;
+                *elapsed_cycles_line += 1;
 
-                if elapsed_cycles_line == 456 {
-                    if ly == 153 {
-                        (
-                            Self::switch_from_vblank_to_oam_scan(ppu, interrupt_line),
-                            None,
-                        )
+                if *elapsed_cycles_line == 456 {
+                    if *ly == 153 {
+                        *self = Self::switch_from_vblank_to_oam_scan(ppu_ctx, interrupt_line);
+
+                        None
                     } else {
-                        ly += 1;
-                        elapsed_cycles_line = 0;
+                        *ly += 1;
+                        *elapsed_cycles_line = 0;
 
-                        ppu.ly += 1;
-                        ppu.check_lyc_compare(interrupt_line);
+                        ppu_ctx.ly += 1;
+                        ppu_ctx.check_lyc_compare(interrupt_line);
 
-                        (
-                            Mode::VBlank {
-                                elapsed_cycles_line,
-                                ly,
-                            },
-                            None,
-                        )
+                        None
                     }
                 } else {
-                    if elapsed_cycles_line == 4 && ly == 153 {
+                    if *elapsed_cycles_line == 4 && *ly == 153 {
                         // Simulate that the VBlank change LY to 0 after 4 T-cycles in the line 153
-                        ppu.ly = 0;
-                        ppu.check_lyc_compare(interrupt_line);
+                        ppu_ctx.ly = 0;
+                        ppu_ctx.check_lyc_compare(interrupt_line);
                     }
 
-                    (
-                        Mode::VBlank {
-                            elapsed_cycles_line,
-                            ly,
-                        },
-                        None,
-                    )
+                    None
                 }
             }
         }
     }
 
     fn switch_from_oam_scan_to_drawing(
-        ppu: &mut Ppu,
+        ppu_ctx: &mut Context,
         mut sprite_buffer: [Option<oam::Sprite>; 10],
         wy_match_ly: bool,
         win_ly: u8,
-    ) -> Mode {
+    ) -> Self {
         sprite_buffer.sort_by(|a, b| match a {
             Some(a) => match b {
                 Some(b) => a.x().cmp(&b.x()),
@@ -423,16 +351,19 @@ impl Mode {
             },
         });
 
-        Mode::Drawing {
+        Self::Drawing {
             sprite_buffer,
             wy_match_ly,
-            scx_delay: ppu.scx % 8,
+            scx_delay: ppu_ctx.scx % 8,
             lx: 0,
             elapsed_cycles: 0,
             win_fetcher: false,
             bg_win_fetcher: fetcher::BackgroundWindowFetcher::new(
-                ppu.lcdc.bg_tile_map(),
-                tiling::PixelPosition::new(ppu.scx as usize, ppu.ly as usize + ppu.scy as usize),
+                ppu_ctx.lcdc.bg_tile_map(),
+                tiling::PixelPosition::new(
+                    ppu_ctx.scx as usize,
+                    ppu_ctx.ly as usize + ppu_ctx.scy as usize,
+                ),
             ),
             bg_win_fifo: fifo::Fifo::new(),
             sprite_fetcher: None,
@@ -442,59 +373,62 @@ impl Mode {
     }
 
     fn switch_from_drawing_to_hblank(
-        ppu: &mut Ppu,
+        ppu_ctx: &mut Context,
         interrupt_line: &mut dyn InterruptLine,
         elapsed_cycles: usize,
         wy_match_ly: bool,
         win_ly: u8,
-    ) -> Mode {
-        if ppu.stat.hblank_interrupt_enabled() {
+    ) -> Self {
+        if ppu_ctx.stat.hblank_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
 
-        Mode::HBlank {
+        Self::HBlank {
             elapsed_cycles,
             win_ly,
             wy_match_ly,
         }
     }
 
-    fn switch_from_hblank_to_vblank(ppu: &mut Ppu, interrupt_line: &mut dyn InterruptLine) -> Mode {
+    fn switch_from_hblank_to_vblank(
+        ppu_ctx: &mut Context,
+        interrupt_line: &mut dyn InterruptLine,
+    ) -> Self {
         interrupt_line.request(InterruptKind::VBlank);
-        if ppu.stat.vblank_interrupt_enabled() {
+        if ppu_ctx.stat.vblank_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
-        if ppu.stat.oam_scanning_interrupt_enabled() {
+        if ppu_ctx.stat.oam_scanning_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
 
-        if ppu.skip_frame {
-            ppu.skip_frame = false;
+        if ppu_ctx.skip_frame {
+            ppu_ctx.skip_frame = false;
         } else {
-            ppu.screen.commit_frame()
+            ppu_ctx.screen.commit_frame()
         }
 
-        ppu.ly += 1;
-        ppu.check_lyc_compare(interrupt_line);
+        ppu_ctx.ly += 1;
+        ppu_ctx.check_lyc_compare(interrupt_line);
 
-        Mode::VBlank {
+        Self::VBlank {
             elapsed_cycles_line: 0,
-            ly: ppu.ly,
+            ly: ppu_ctx.ly,
         }
     }
 
     fn switch_from_hblank_to_oam_scan(
-        ppu: &mut Ppu,
+        ppu_ctx: &mut Context,
         interrupt_line: &mut dyn InterruptLine,
         wy_match_ly: bool,
         win_ly: u8,
-    ) -> Mode {
-        if ppu.stat.oam_scanning_interrupt_enabled() {
+    ) -> Self {
+        if ppu_ctx.stat.oam_scanning_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
 
-        ppu.ly += 1;
-        ppu.check_lyc_compare(interrupt_line);
+        ppu_ctx.ly += 1;
+        ppu_ctx.check_lyc_compare(interrupt_line);
 
         Self::OAMScan {
             sprite_buffer: [None; 10],
@@ -507,10 +441,10 @@ impl Mode {
     }
 
     fn switch_from_vblank_to_oam_scan(
-        ppu: &mut Ppu,
+        ppu_ctx: &mut Context,
         interrupt_line: &mut dyn InterruptLine,
-    ) -> Mode {
-        if ppu.stat.oam_scanning_interrupt_enabled() {
+    ) -> Self {
+        if ppu_ctx.stat.oam_scanning_interrupt_enabled() {
             interrupt_line.request(InterruptKind::Stat);
         }
 
@@ -519,7 +453,7 @@ impl Mode {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Ppu {
+pub struct Context {
     skip_frame: bool,
     lcdc: registers::Lcdc,
     lyc_compare: bool,
@@ -533,26 +467,12 @@ pub struct Ppu {
     bgp: color::Palette,
     obp0: color::Palette,
     obp1: color::Palette,
-    mode: Mode,
     vram: [u8; 0x2000],
     oam: oam::Oam,
     screen: screen::Screen,
-    ldc_event: Option<screen::Event>,
 }
 
-impl Debug for Ppu {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "LCDC:{:08b} STAT:{:08b} LY:{:02x}",
-            self.read_lcdc(),
-            self.read_stat(),
-            self.ly,
-        )
-    }
-}
-
-impl Ppu {
+impl Context {
     pub fn new(screen_config: screen::Config) -> Self {
         Self {
             skip_frame: false,
@@ -568,19 +488,10 @@ impl Ppu {
             bgp: 0.into(),
             obp0: 0.into(),
             obp1: 0.into(),
-            mode: Mode::default(),
             vram: [0x0; 0x2000],
             oam: oam::Oam::new(),
             screen: screen::Screen::new(screen_config),
-            ldc_event: None,
         }
-    }
-
-    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) -> Option<screen::Event> {
-        let (new_mode, screen_event) = self.mode.execute(self, interrupt_line);
-        self.mode = new_mode;
-        let lcd_event = self.ldc_event.take();
-        screen_event.or(lcd_event)
     }
 
     pub fn check_lyc_compare(&mut self, interrupt_line: &mut dyn InterruptLine) {
@@ -594,51 +505,86 @@ impl Ppu {
             }
         }
     }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Ppu {
+    mode: Mode,
+    ctx: Context,
+    pending_lcd_event: Option<screen::Event>,
+}
+
+impl Debug for Ppu {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "LCDC:{:08b} STAT:{:08b} LY:{:02x}",
+            self.read_lcdc(),
+            self.read_stat(),
+            self.ctx.ly,
+        )
+    }
+}
+
+impl Ppu {
+    pub fn new(screen_config: screen::Config) -> Self {
+        Self {
+            mode: Mode::default(),
+            ctx: Context::new(screen_config),
+            pending_lcd_event: None,
+        }
+    }
+
+    pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) -> Option<screen::Event> {
+        let screen_event = self.mode.execute(&mut self.ctx, interrupt_line);
+        let lcd_event = self.pending_lcd_event.take();
+        screen_event.or(lcd_event)
+    }
 
     pub fn read_vram_byte(&self, address: u16) -> u8 {
         match self.mode {
-            Mode::Drawing { .. } if self.lcdc.lcd_enabled() => 0xFF,
-            _ => self.vram[address as usize],
+            Mode::Drawing { .. } if self.ctx.lcdc.lcd_enabled() => 0xFF,
+            _ => self.ctx.vram[address as usize],
         }
     }
 
     pub fn write_vram_byte(&mut self, address: u16, value: u8) {
         match self.mode {
-            Mode::Drawing { .. } if self.lcdc.lcd_enabled() => {}
-            _ => self.vram[address as usize] = value,
+            Mode::Drawing { .. } if self.ctx.lcdc.lcd_enabled() => {}
+            _ => self.ctx.vram[address as usize] = value,
         }
     }
 
     pub fn read_oam_byte(&self, address: u16) -> u8 {
         match self.mode {
-            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => 0xFF,
-            _ => self.oam.read_byte(address),
+            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.ctx.lcdc.lcd_enabled() => 0xFF,
+            _ => self.ctx.oam.read_byte(address),
         }
     }
 
     pub fn write_oam_byte(&mut self, address: u16, value: u8) {
         match self.mode {
-            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.lcdc.lcd_enabled() => {}
-            _ => self.oam.write_byte(address, value),
+            Mode::OAMScan { .. } | Mode::Drawing { .. } if self.ctx.lcdc.lcd_enabled() => {}
+            _ => self.ctx.oam.write_byte(address, value),
         }
     }
 
     pub fn read_lcdc(&self) -> u8 {
-        self.lcdc.into()
+        self.ctx.lcdc.into()
     }
 
     pub fn write_lcdc(&mut self, value: u8) {
         let new_lcdc: registers::Lcdc = value.into();
-        if new_lcdc != self.lcdc {
-            if new_lcdc.lcd_enabled() != self.lcdc.lcd_enabled() {
+        if new_lcdc != self.ctx.lcdc {
+            if new_lcdc.lcd_enabled() != self.ctx.lcdc.lcd_enabled() {
                 if new_lcdc.lcd_enabled() {
-                    self.ldc_event = Some(screen::Event::LCDOn);
-                    self.skip_frame = true;
+                    self.pending_lcd_event = Some(screen::Event::LCDOn);
+                    self.ctx.skip_frame = true;
 
                     self.mode = Mode::default();
                 } else {
-                    self.ldc_event = Some(screen::Event::LCDOff);
-                    self.screen.off();
+                    self.pending_lcd_event = Some(screen::Event::LCDOff);
+                    self.ctx.screen.off();
 
                     self.mode = Mode::HBlank {
                         elapsed_cycles: 0,
@@ -646,12 +592,12 @@ impl Ppu {
                         win_ly: 0,
                     };
 
-                    self.ly = 0;
-                    self.lyc_compare = true;
+                    self.ctx.ly = 0;
+                    self.ctx.lyc_compare = true;
                 }
             }
 
-            self.lcdc = value.into();
+            self.ctx.lcdc = value.into();
         }
     }
 
@@ -663,9 +609,9 @@ impl Ppu {
             Mode::Drawing { .. } => 0b11,
         };
 
-        let coincidence_flag = if self.lyc_compare { 0b100 } else { 0b000 };
+        let coincidence_flag = if self.ctx.lyc_compare { 0b100 } else { 0b000 };
 
-        mode_bits | coincidence_flag | u8::from(self.stat) | 0b10000000
+        mode_bits | coincidence_flag | u8::from(self.ctx.stat) | 0b10000000
     }
 
     pub fn write_stat(&mut self, value: u8) {
@@ -673,81 +619,81 @@ impl Ppu {
         //   bit 0-1: read only corresponding to the mode
         //   bit 2: read only corresponding to the coincidence flag
         //   bit 7: unused, always set to 1
-        self.stat = (value & 0b01111000).into()
+        self.ctx.stat = (value & 0b01111000).into()
     }
 
     pub fn read_scy(&self) -> u8 {
-        self.scy
+        self.ctx.scy
     }
 
     pub fn write_scy(&mut self, value: u8) {
-        self.scy = value
+        self.ctx.scy = value
     }
 
     pub fn read_scx(&self) -> u8 {
-        self.scx
+        self.ctx.scx
     }
 
     pub fn write_scx(&mut self, value: u8) {
-        self.scx = value
+        self.ctx.scx = value
     }
 
     pub fn read_ly(&self) -> u8 {
-        self.ly
+        self.ctx.ly
     }
 
     pub fn write_ly(&mut self, _: u8) {
-        self.ly = 0
+        self.ctx.ly = 0
     }
 
     pub fn read_lyc(&self) -> u8 {
-        self.lyc
+        self.ctx.lyc
     }
 
     pub fn write_lyc(&mut self, value: u8) {
-        self.lyc = value
+        self.ctx.lyc = value
     }
 
     pub fn read_bgp(&self) -> u8 {
-        self.bgp.into()
+        self.ctx.bgp.into()
     }
 
     pub fn write_bgp(&mut self, value: u8) {
-        self.bgp = value.into()
+        self.ctx.bgp = value.into()
     }
 
     pub fn read_obp0(&self) -> u8 {
-        self.obp0.into()
+        self.ctx.obp0.into()
     }
 
     pub fn write_obp0(&mut self, value: u8) {
-        self.obp0 = value.into()
+        self.ctx.obp0 = value.into()
     }
     pub fn read_obp1(&self) -> u8 {
-        self.obp1.into()
+        self.ctx.obp1.into()
     }
 
     pub fn write_obp1(&mut self, value: u8) {
-        self.obp1 = value.into()
+        self.ctx.obp1 = value.into()
     }
 
     pub fn read_wy(&self) -> u8 {
-        self.wy
+        self.ctx.wy
     }
 
     pub fn write_wy(&mut self, value: u8) {
-        self.wy = value
+        self.ctx.wy = value
     }
 
     pub fn read_wx(&self) -> u8 {
-        self.wx
+        self.ctx.wx
     }
 
     pub fn write_wx(&mut self, value: u8) {
-        self.wx = value
+        self.ctx.wx = value
     }
 
     pub fn screen(&self) -> &screen::Screen {
-        &self.screen
+        &self.ctx.screen
     }
 }

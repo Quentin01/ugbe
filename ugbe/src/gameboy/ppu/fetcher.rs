@@ -26,10 +26,10 @@ pub struct BackgroundWindowPixel {
 }
 
 impl BackgroundWindowPixel {
-    fn new(ppu: &super::Ppu, color_id: super::color::Id) -> Self {
+    fn new(ppu_ctx: &super::Context, color_id: super::color::Id) -> Self {
         BackgroundWindowPixel {
             color_id,
-            palette: ppu.bgp,
+            palette: ppu_ctx.bgp,
         }
     }
 
@@ -67,7 +67,7 @@ impl BackgroundWindowFetcher {
 
     pub fn tick(
         &mut self,
-        ppu: &super::Ppu,
+        ppu_ctx: &super::Context,
         fifo: &mut super::fifo::Fifo<BackgroundWindowPixel, 8>,
     ) {
         let mut new_state = match self.state {
@@ -75,7 +75,7 @@ impl BackgroundWindowFetcher {
                 if elapsed_cycle == 1 {
                     let tile_position = self.position.into();
 
-                    let tile_no = self.tile_map.tile_number(ppu, &tile_position);
+                    let tile_no = self.tile_map.tile_number(ppu_ctx, &tile_position);
                     FetcherState::GetTileDataLow {
                         elapsed_cycle: 0,
                         tile_no,
@@ -92,10 +92,10 @@ impl BackgroundWindowFetcher {
             } => {
                 if elapsed_cycle == 1 {
                     let row = self.position.y() % 8;
-                    let tile_low_row_data = ppu
+                    let tile_low_row_data = ppu_ctx
                         .lcdc
                         .bg_and_window_tile_data_map()
-                        .tile(ppu, &tile_no)
+                        .tile(ppu_ctx, &tile_no)
                         .get_low_row_data(row);
 
                     FetcherState::GetTileDataHigh {
@@ -117,10 +117,10 @@ impl BackgroundWindowFetcher {
             } => {
                 if elapsed_cycle == 1 {
                     let row = self.position.y() % 8;
-                    let tile_high_row_data = ppu
+                    let tile_high_row_data = ppu_ctx
                         .lcdc
                         .bg_and_window_tile_data_map()
-                        .tile(ppu, &tile_no)
+                        .tile(ppu_ctx, &tile_no)
                         .get_high_row_data(row);
 
                     FetcherState::Push {
@@ -149,10 +149,10 @@ impl BackgroundWindowFetcher {
                         super::tiling::tile_pixel_row(tile_high_row_data, tile_low_row_data);
 
                     for pixel_color_id in pixel_row.into_iter() {
-                        if ppu.lcdc.display_bg() {
-                            fifo.push(BackgroundWindowPixel::new(ppu, pixel_color_id));
+                        if ppu_ctx.lcdc.display_bg() {
+                            fifo.push(BackgroundWindowPixel::new(ppu_ctx, pixel_color_id));
                         } else {
-                            fifo.push(BackgroundWindowPixel::new(ppu, super::color::Id::ZERO));
+                            fifo.push(BackgroundWindowPixel::new(ppu_ctx, super::color::Id::ZERO));
                         }
                     }
 
@@ -186,8 +186,8 @@ impl SpritePixel {
         self.sprite.over_bg_and_win()
     }
 
-    pub fn color(&self, ppu: &super::Ppu) -> super::color::Color {
-        self.sprite.palette(ppu)[self.color_id]
+    pub fn color(&self, ppu_ctx: &super::Context) -> super::color::Color {
+        self.sprite.palette(ppu_ctx)[self.color_id]
     }
 }
 
@@ -199,11 +199,11 @@ pub struct SpriteFetcher {
 }
 
 impl SpriteFetcher {
-    pub fn new(sprite: super::oam::Sprite, ppu: &super::Ppu) -> Self {
+    pub fn new(sprite: super::oam::Sprite, ppu_ctx: &super::Context) -> Self {
         let pixel_row = if sprite.y_flip() {
-            ppu.lcdc.sprite_height() - (ppu.ly + 16 - sprite.y()) - 1
+            ppu_ctx.lcdc.sprite_height() - (ppu_ctx.ly + 16 - sprite.y()) - 1
         } else {
-            ppu.ly + 16 - sprite.y()
+            ppu_ctx.ly + 16 - sprite.y()
         };
 
         Self {
@@ -215,7 +215,7 @@ impl SpriteFetcher {
 
     pub fn tick(
         &mut self,
-        ppu: &super::Ppu,
+        ppu_ctx: &super::Context,
         lx: u8,
         fifo: &mut super::fifo::Fifo<SpritePixel, 8>,
     ) -> bool {
@@ -240,10 +240,10 @@ impl SpriteFetcher {
             } => {
                 if elapsed_cycle == 1 {
                     let row = self.pixel_row;
-                    let tile_low_row_data = ppu
+                    let tile_low_row_data = ppu_ctx
                         .lcdc
                         .obj_tile_data_map()
-                        .tile(ppu, &tile_no)
+                        .tile(ppu_ctx, &tile_no)
                         .get_low_row_data(row);
 
                     FetcherState::GetTileDataHigh {
@@ -265,10 +265,10 @@ impl SpriteFetcher {
             } => {
                 if elapsed_cycle == 1 {
                     let row = self.pixel_row;
-                    let tile_high_row_data = ppu
+                    let tile_high_row_data = ppu_ctx
                         .lcdc
                         .obj_tile_data_map()
-                        .tile(ppu, &tile_no)
+                        .tile(ppu_ctx, &tile_no)
                         .get_high_row_data(row);
 
                     FetcherState::Push {

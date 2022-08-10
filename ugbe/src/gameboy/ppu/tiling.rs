@@ -88,13 +88,13 @@ impl TileMap {
         Self { start }
     }
 
-    pub fn tile_number(&self, ppu: &super::Ppu, position: &TilePosition) -> TileNo {
+    pub fn tile_number(&self, ppu_ctx: &super::Context, position: &TilePosition) -> TileNo {
         let tile_x = (position.x as usize % Self::WIDTH) as u16;
         let tile_y = (position.y as usize % Self::HEIGHT) as u16;
 
         let tile_offset = (Self::WIDTH as u16 * tile_y) + tile_x;
         let tile_addr = self.start + (tile_offset & 0x3FF);
-        TileNo(ppu.vram[tile_addr as usize])
+        TileNo(ppu_ctx.vram[tile_addr as usize])
     }
 }
 
@@ -169,7 +169,7 @@ impl TileDataMap {
         Self { method, size }
     }
 
-    pub fn tile<'a>(&self, ppu: &'a super::Ppu, tile_no: &TileNo) -> Tile<'a> {
+    pub fn tile<'a>(&self, ppu_ctx: &'a super::Context, tile_no: &TileNo) -> Tile<'a> {
         let bits_count_to_ignore = self.size / Self::TILE_SIZE_IN_MEMORY;
         let tile_mask = !((1 << (bits_count_to_ignore - 1)) - 1);
         let tile_no = tile_no.0 & tile_mask;
@@ -190,7 +190,7 @@ impl TileDataMap {
         let tile_address_end = tile_address + self.size as usize;
 
         Tile {
-            data: &ppu.vram[tile_address..tile_address_end],
+            data: &ppu_ctx.vram[tile_address..tile_address_end],
         }
     }
 }
