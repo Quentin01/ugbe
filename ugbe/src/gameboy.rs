@@ -7,6 +7,7 @@ mod interrupt;
 pub mod joypad;
 mod mmu;
 mod ppu;
+pub mod spu;
 mod timer;
 mod wram;
 
@@ -57,6 +58,7 @@ impl GameboyBuilder {
             cartridge: self.cartridge.into(),
             joypad: joypad::Joypad::new(),
             ppu: ppu::Ppu::new(self.screen_config),
+            spu: spu::Spu::new(),
             cpu: cpu::Cpu::new(),
             bus: bus::Bus::new(),
             interrupt: interrupt::Interrupt::new(),
@@ -73,6 +75,7 @@ pub struct Gameboy {
     cartridge: cartridge::Cartridge,
     joypad: joypad::Joypad,
     ppu: ppu::Ppu,
+    spu: spu::Spu,
     cpu: cpu::Cpu,
     bus: bus::Bus,
     interrupt: interrupt::Interrupt,
@@ -82,7 +85,7 @@ pub struct Gameboy {
 }
 
 impl Gameboy {
-    pub fn tick(&mut self) -> Option<screen::Event> {
+    pub fn tick(&mut self) -> (Option<screen::Event>, Option<spu::SampleFrame>) {
         if self.clock.is_m_cycle() {
             let memory_operation = self.cpu.tick(&self.bus, &mut self.interrupt);
             self.bus.tick(
@@ -91,6 +94,7 @@ impl Gameboy {
                 &mut components::MmuContext {
                     joypad: &mut self.joypad,
                     ppu: &mut self.ppu,
+                    spu: &mut self.spu,
                     timer: &mut self.timer,
                     interrupt: &mut self.interrupt,
                     boot_rom: &mut self.boot_rom,
@@ -101,12 +105,20 @@ impl Gameboy {
         }
 
         let screen_event = self.ppu.tick(&mut self.interrupt);
+        self.spu.tick();
+
+        let sample_frame = if self.clock.is_apu_cycle() {
+            Some(self.spu.sample_frame())
+        } else {
+            None
+        };
+
         self.timer.tick(&mut self.interrupt);
         self.joypad.tick(&mut self.interrupt);
 
         self.clock.tick();
 
-        screen_event
+        (screen_event, sample_frame)
     }
 
     pub fn clock(&self) -> &clock::Clock {

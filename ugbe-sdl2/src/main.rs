@@ -1,4 +1,5 @@
 extern crate anyhow;
+extern crate blip_buf;
 extern crate crossbeam_channel;
 extern crate sdl2;
 
@@ -17,6 +18,10 @@ const BYTES_PER_PIXEL: u32 = 2;
 const TEXTURE_WIDTH: u32 = gameboy::screen::Screen::WIDTH as u32;
 const TEXTURE_HEIGHT: u32 = gameboy::screen::Screen::HEIGHT as u32;
 const TEXTURE_PITCH: usize = (TEXTURE_WIDTH * BYTES_PER_PIXEL) as usize;
+
+const SAMPLE_RATE: usize = 48000;
+const SAMPLE_COUNT_PER_EVENT: usize = 1024;
+const SAMPLE_BUFFER_SIZE: u16 = 512;
 
 #[derive(Debug)]
 struct SdlError(String);
@@ -37,6 +42,7 @@ enum ExternalGameboyEvent {
 
 enum InternalGameboyEvent {
     VBlank([u8; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize]),
+    AudioSamples([gameboy::spu::SampleFrame; SAMPLE_COUNT_PER_EVENT]),
 }
 
 fn main() -> Result<()> {
@@ -66,10 +72,17 @@ fn main() -> Result<()> {
     let sdl_context = sdl2::init()
         .map_err(SdlError)
         .context("unable to init SDL2")?;
+
     let video_subsystem = sdl_context
         .video()
         .map_err(SdlError)
         .context("unable to init SDL2 video subsystem")?;
+
+    let audio_subsystem = sdl_context
+        .audio()
+        .map_err(SdlError)
+        .context("unable to init SDL2 audio subsystem")?;
+
     let game_controller_subsystem = sdl_context
         .game_controller()
         .map_err(SdlError)
@@ -112,6 +125,28 @@ fn main() -> Result<()> {
         .context("unable to init SDL2 event pump")?;
 
     let mut texture_data = [0; (TEXTURE_WIDTH * TEXTURE_HEIGHT * BYTES_PER_PIXEL) as usize];
+
+    let audio_desired_spec = sdl2::audio::AudioSpecDesired {
+        freq: Some(SAMPLE_RATE as i32),
+        channels: Some(2),
+        samples: Some(SAMPLE_BUFFER_SIZE),
+    };
+
+    let audio_queue = audio_subsystem
+        .open_queue::<i16, _>(None, &audio_desired_spec)
+        .map_err(SdlError)
+        .context("unable to init SDL2 audio queue")?;
+
+    audio_queue.resume();
+
+    let mut audio_buff_left = blip_buf::BlipBuf::new((SAMPLE_COUNT_PER_EVENT * 10) as u32);
+    let mut audio_buff_right = blip_buf::BlipBuf::new((SAMPLE_COUNT_PER_EVENT * 10) as u32);
+
+    audio_buff_left.set_rates(gameboy::spu::SAMPLE_RATE as f64, SAMPLE_RATE as f64);
+    audio_buff_right.set_rates(gameboy::spu::SAMPLE_RATE as f64, SAMPLE_RATE as f64);
+
+    let mut audio_buff_previous_left = 0;
+    let mut audio_buff_previous_right = 0;
 
     let (sender_internal, receiver_internal) = crossbeam_channel::unbounded();
     let (sender_external, receiver_external) = crossbeam_channel::unbounded();
@@ -213,6 +248,41 @@ fn main() -> Result<()> {
                         vblank = true;
                         texture_data = frame_data;
                     }
+                    InternalGameboyEvent::AudioSamples(sample_frames) => {
+                        let mut audio_buff_clock_time = 0;
+
+                        for sample_frame in sample_frames {
+                            audio_buff_left.add_delta(
+                                audio_buff_clock_time,
+                                sample_frame.left() - audio_buff_previous_left,
+                            );
+                            audio_buff_previous_left = sample_frame.left() as i32;
+
+                            audio_buff_right.add_delta(
+                                audio_buff_clock_time,
+                                sample_frame.right() - audio_buff_previous_right,
+                            );
+                            audio_buff_previous_right = sample_frame.right() as i32;
+
+                            audio_buff_clock_time += 1;
+                        }
+
+                        audio_buff_left.end_frame(audio_buff_clock_time - 1);
+                        audio_buff_right.end_frame(audio_buff_clock_time - 1);
+
+                        while audio_buff_left.samples_avail() > 0 {
+                            let mut samples = [0; 2048];
+                            let nb_samples_left = audio_buff_left.read_samples(&mut samples, true);
+                            let nb_samples_right =
+                                audio_buff_right.read_samples(&mut samples[1..], true);
+                            assert!(nb_samples_left == nb_samples_right);
+
+                            audio_queue
+                                .queue_audio(&samples[0..(nb_samples_left + nb_samples_right)])
+                                .map_err(SdlError)
+                                .context("unable to push audio samples to queue")?;
+                        }
+                    }
                 }
             }
 
@@ -246,6 +316,9 @@ fn run_emulation(
     internal_events: crossbeam_channel::Sender<InternalGameboyEvent>,
     external_events: crossbeam_channel::Receiver<ExternalGameboyEvent>,
 ) {
+    let mut sample_frames_idx = 0;
+    let mut sample_frames = [gameboy::spu::SampleFrame::default(); SAMPLE_COUNT_PER_EVENT];
+
     let mut lag_duration = std::time::Duration::new(0, 0);
     let mut before_frame = std::time::Instant::now();
 
@@ -264,7 +337,23 @@ fn run_emulation(
             }
 
             loop {
-                match gameboy.tick() {
+                let (screen_event, sample_frame) = gameboy.tick();
+
+                match sample_frame {
+                    Some(sample_frame) => {
+                        sample_frames[sample_frames_idx] = sample_frame;
+                        sample_frames_idx += 1;
+                        if sample_frames_idx == SAMPLE_COUNT_PER_EVENT {
+                            internal_events
+                                .send(InternalGameboyEvent::AudioSamples(sample_frames))
+                                .expect("Couldn't send audio samples");
+                            sample_frames_idx = 0;
+                        }
+                    }
+                    None => {}
+                }
+
+                match screen_event {
                     Some(screen_event) => match screen_event {
                         gameboy::screen::Event::VBlank => break,
                         gameboy::screen::Event::LCDOn => {}

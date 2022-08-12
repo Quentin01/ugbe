@@ -18,6 +18,7 @@ pub trait InterruptLine {
 pub struct MmuContext<'components> {
     pub joypad: &'components mut super::joypad::Joypad,
     pub ppu: &'components mut super::ppu::Ppu,
+    pub spu: &'components mut super::spu::Spu,
     pub timer: &'components mut super::timer::Timer,
     pub interrupt: &'components mut super::interrupt::Interrupt,
     pub boot_rom: &'components mut crate::bootrom::BootRom,

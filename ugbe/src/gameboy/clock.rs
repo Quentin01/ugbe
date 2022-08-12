@@ -1,4 +1,4 @@
-const FREQUENCY: usize = 4_194_304;
+pub const FREQUENCY: usize = 4_194_304;
 const T_CYCLE_DURATION: std::time::Duration =
     std::time::Duration::new(0, (1_000_000_000f64 / FREQUENCY as f64) as u32);
 
@@ -17,6 +17,10 @@ impl Clock {
 
     pub fn is_m_cycle(&self) -> bool {
         self.t_cycle_count % 4 == 0
+    }
+
+    pub fn is_apu_cycle(&self) -> bool {
+        self.t_cycle_count % 2 == 0
     }
 
     pub fn now(&self) -> Instant {
