@@ -97,7 +97,7 @@ impl Mode {
                     Some(sprite) => {
                         // During odd T-cycles we are checking if the sprite should be added to the sprite buffer
                         if *sprite_buffer_idx >= 10 {
-                            if *sprite_no >= oam::SpriteNo::last() {
+                            if sprite.no() >= oam::SpriteNo::last() {
                                 *self = Self::switch_from_oam_scan_to_drawing(
                                     ppu_ctx,
                                     *sprite_buffer,
@@ -129,7 +129,7 @@ impl Mode {
                             *sprite_buffer_idx += 1;
                         }
 
-                        if *sprite_no >= oam::SpriteNo::last() {
+                        if sprite.no() >= oam::SpriteNo::last() {
                             *self = Self::switch_from_oam_scan_to_drawing(
                                 ppu_ctx,
                                 *sprite_buffer,
