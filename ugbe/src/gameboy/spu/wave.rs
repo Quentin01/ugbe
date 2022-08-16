@@ -6,7 +6,7 @@ use super::Voice;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct WaveVoice {
     enabled: bool,
-    frame_sequencer: FrameSequencer,
+    dac_enabled: bool,
 
     length_counter: LengthCounter<8>,
     length_counter_enabled: bool,
@@ -24,7 +24,7 @@ impl WaveVoice {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            frame_sequencer: FrameSequencer::new(),
+            dac_enabled: false,
 
             length_counter: LengthCounter::new(),
             length_counter_enabled: false,
@@ -39,18 +39,16 @@ impl WaveVoice {
         }
     }
 
-    pub fn tick(&mut self) {
-        if !self.enabled {
-            return;
-        }
-
-        self.frame_sequencer.tick();
-
+    pub fn tick(&mut self, frame_sequencer: &FrameSequencer) {
         if self.length_counter_enabled {
-            self.length_counter.tick(&self.frame_sequencer);
+            self.length_counter.tick(frame_sequencer);
             if self.length_counter.value() == 0 {
                 self.enabled = false;
             }
+        }
+
+        if !self.enabled {
+            return;
         }
 
         self.frequency_timer -= 1;
@@ -61,23 +59,38 @@ impl WaveVoice {
     }
 
     fn trigger(&mut self) {
-        self.enabled = true;
-
-        if self.length_counter_enabled {
-            self.length_counter.trigger();
+        if self.dac_enabled {
+            self.enabled = true;
         }
+
+        self.length_counter.trigger();
 
         self.frequency_timer = (2048 - self.frequency as usize) * 4;
 
         self.ram_idx = 0;
     }
 
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.dac_enabled = false;
+
+        self.length_counter_enabled = false;
+
+        self.volume_shift = 0;
+
+        self.frequency = 0;
+        self.frequency_timer = 2048 * 4;
+
+        self.ram_idx = 0;
+    }
+
     pub fn read_register_0(&self) -> u8 {
-        (self.enabled as u8) << 7 | 0b0111_1111
+        (self.dac_enabled as u8) << 7 | 0b0111_1111
     }
 
     pub fn write_register_0(&mut self, value: u8) {
-        self.enabled = (value >> 7) & 0b1 != 0;
+        self.dac_enabled = (value >> 7) & 0b1 != 0;
+        self.enabled = self.enabled && self.dac_enabled;
     }
 
     pub fn read_register_1(&self) -> u8 {
@@ -97,7 +110,7 @@ impl WaveVoice {
     }
 
     pub fn read_register_3(&self) -> u8 {
-        (self.frequency & 0xFF) as u8
+        0xFF
     }
 
     pub fn write_register_3(&mut self, value: u8) {
@@ -105,10 +118,7 @@ impl WaveVoice {
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b1000_0000
-            | ((self.length_counter_enabled as u8) << 6)
-            | 0b0011_1000
-            | (((self.frequency >> 8) as u8) & 0b0111)
+        0b1000_0000 | ((self.length_counter_enabled as u8) << 6) | 0b0011_1111
     }
 
     pub fn write_register_4(&mut self, value: u8) {

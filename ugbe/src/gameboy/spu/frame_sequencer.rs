@@ -13,7 +13,7 @@ impl FrameSequencer {
         Self {
             counter: 0,
             step: 0,
-            should_tick_length_counter: false,
+            should_tick_length_counter: true,
             should_tick_volume_envelope: false,
             should_tick_frequency_sweep: false,
         }
@@ -36,7 +36,7 @@ impl FrameSequencer {
         }
     }
 
-    pub fn trigger(&mut self) {
+    pub fn reset(&mut self) {
         self.counter = 0;
         self.step = 0;
         self.should_tick_length_counter = true;

@@ -25,6 +25,9 @@ type Voice4 = noise::NoiseVoice;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spu {
     enabled: bool,
+
+    frame_sequencer: frame_sequencer::FrameSequencer,
+
     left_volume: u8,
     right_volume: u8,
 
@@ -43,6 +46,9 @@ pub struct Spu {
     voice4: Voice4,
     voice4_left_enabled: bool,
     voice4_right_enabled: bool,
+
+    vin_left_enabled: bool,
+    vin_right_enabled: bool,
 }
 
 impl Default for Spu {
@@ -55,6 +61,8 @@ impl Spu {
     pub fn new() -> Self {
         Self {
             enabled: false,
+
+            frame_sequencer: frame_sequencer::FrameSequencer::new(),
 
             left_volume: 0,
             right_volume: 0,
@@ -74,15 +82,20 @@ impl Spu {
             voice4: noise::NoiseVoice::new(),
             voice4_left_enabled: false,
             voice4_right_enabled: false,
+
+            vin_left_enabled: false,
+            vin_right_enabled: false,
         }
     }
 
     pub fn tick(&mut self) {
         if self.enabled {
-            self.voice1.tick();
-            self.voice2.tick();
-            self.voice3.tick();
-            self.voice4.tick();
+            self.voice1.tick(&self.frame_sequencer);
+            self.voice2.tick(&self.frame_sequencer);
+            self.voice3.tick(&self.frame_sequencer);
+            self.voice4.tick(&self.frame_sequencer);
+
+            self.frame_sequencer.tick();
         }
     }
 
@@ -166,6 +179,10 @@ impl Spu {
     }
 
     pub fn write_nr10(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice1.write_register_0(value)
     }
 
@@ -174,6 +191,10 @@ impl Spu {
     }
 
     pub fn write_nr11(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice1.write_register_1(value)
     }
 
@@ -182,6 +203,10 @@ impl Spu {
     }
 
     pub fn write_nr12(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice1.write_register_2(value)
     }
 
@@ -190,6 +215,10 @@ impl Spu {
     }
 
     pub fn write_nr13(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice1.write_register_3(value)
     }
 
@@ -198,6 +227,10 @@ impl Spu {
     }
 
     pub fn write_nr14(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice1.write_register_4(value)
     }
 
@@ -206,6 +239,10 @@ impl Spu {
     }
 
     pub fn write_nr20(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice2.write_register_0(value)
     }
 
@@ -214,6 +251,10 @@ impl Spu {
     }
 
     pub fn write_nr21(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice2.write_register_1(value)
     }
 
@@ -222,6 +263,10 @@ impl Spu {
     }
 
     pub fn write_nr22(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice2.write_register_2(value)
     }
 
@@ -230,6 +275,10 @@ impl Spu {
     }
 
     pub fn write_nr23(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice2.write_register_3(value)
     }
 
@@ -238,6 +287,10 @@ impl Spu {
     }
 
     pub fn write_nr24(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice2.write_register_4(value)
     }
 
@@ -246,6 +299,10 @@ impl Spu {
     }
 
     pub fn write_nr30(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_register_0(value)
     }
 
@@ -254,6 +311,10 @@ impl Spu {
     }
 
     pub fn write_nr31(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_register_1(value)
     }
 
@@ -262,6 +323,10 @@ impl Spu {
     }
 
     pub fn write_nr32(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_register_2(value)
     }
 
@@ -270,6 +335,10 @@ impl Spu {
     }
 
     pub fn write_nr33(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_register_3(value)
     }
 
@@ -278,6 +347,10 @@ impl Spu {
     }
 
     pub fn write_nr34(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_register_4(value)
     }
 
@@ -286,6 +359,10 @@ impl Spu {
     }
 
     pub fn write_wav_ram(&mut self, address: u16, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice3.write_ram(address, value)
     }
 
@@ -294,6 +371,10 @@ impl Spu {
     }
 
     pub fn write_nr40(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4.write_register_0(value)
     }
 
@@ -302,6 +383,10 @@ impl Spu {
     }
 
     pub fn write_nr41(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4.write_register_1(value)
     }
 
@@ -310,6 +395,10 @@ impl Spu {
     }
 
     pub fn write_nr42(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4.write_register_2(value)
     }
 
@@ -318,6 +407,10 @@ impl Spu {
     }
 
     pub fn write_nr43(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4.write_register_3(value)
     }
 
@@ -326,15 +419,28 @@ impl Spu {
     }
 
     pub fn write_nr44(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4.write_register_4(value)
     }
 
     pub fn read_nr50(&self) -> u8 {
-        ((self.left_volume & 0b0111) << 4) | (self.right_volume & 0b0111)
+        ((self.vin_left_enabled as u8) << 7)
+            | ((self.left_volume & 0b0111) << 4)
+            | ((self.vin_right_enabled as u8) << 3)
+            | (self.right_volume & 0b0111)
     }
 
     pub fn write_nr50(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
+        self.vin_left_enabled = (value >> 7) & 0b1 != 0;
         self.left_volume = (value >> 4) & 0b0111;
+        self.vin_right_enabled = (value >> 3) & 0b1 != 0;
         self.right_volume = value & 0b0111;
     }
 
@@ -350,6 +456,10 @@ impl Spu {
     }
 
     pub fn write_nr51(&mut self, value: u8) {
+        if !self.enabled {
+            return;
+        }
+
         self.voice4_left_enabled = (value >> 7) & 0b1 != 0;
         self.voice3_left_enabled = (value >> 6) & 0b1 != 0;
         self.voice2_left_enabled = (value >> 5) & 0b1 != 0;
@@ -374,10 +484,12 @@ impl Spu {
         self.enabled = (value >> 7) & 0b1 == 1;
 
         if !self.enabled {
-            self.voice1 = square::SquareWaveVoice::new();
-            self.voice2 = square::SquareWaveVoice::new();
-            self.voice3 = wave::WaveVoice::new();
-            self.voice4 = noise::NoiseVoice::new();
+            self.frame_sequencer.reset();
+
+            self.voice1.reset();
+            self.voice2.reset();
+            self.voice3.reset();
+            self.voice4.reset();
 
             self.left_volume = 0;
             self.right_volume = 0;
@@ -391,6 +503,9 @@ impl Spu {
             self.voice3_right_enabled = false;
             self.voice2_right_enabled = false;
             self.voice1_right_enabled = false;
+
+            self.vin_left_enabled = false;
+            self.vin_right_enabled = false;
         }
     }
 }

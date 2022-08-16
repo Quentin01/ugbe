@@ -84,6 +84,14 @@ impl FrequencySweep {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.direction = FrequencyDirection::Increase;
+        self.period = 0;
+        self.period_timer = 0;
+        self.shift = 0;
+    }
+
     pub fn current(&self) -> u16 {
         self.current
     }

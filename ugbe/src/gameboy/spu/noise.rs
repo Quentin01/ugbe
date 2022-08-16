@@ -7,7 +7,7 @@ use super::Voice;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NoiseVoice {
     enabled: bool,
-    frame_sequencer: FrameSequencer,
+    dac_enabled: bool,
 
     length_counter: LengthCounter<6>,
     length_counter_enabled: bool,
@@ -26,7 +26,7 @@ impl NoiseVoice {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            frame_sequencer: FrameSequencer::new(),
+            dac_enabled: false,
 
             length_counter: LengthCounter::new(),
             length_counter_enabled: false,
@@ -42,21 +42,19 @@ impl NoiseVoice {
         }
     }
 
-    pub fn tick(&mut self) {
-        if !self.enabled {
-            return;
-        }
-
-        self.frame_sequencer.tick();
-
+    pub fn tick(&mut self, frame_sequencer: &FrameSequencer) {
         if self.length_counter_enabled {
-            self.length_counter.tick(&self.frame_sequencer);
+            self.length_counter.tick(frame_sequencer);
             if self.length_counter.value() == 0 {
                 self.enabled = false;
             }
         }
 
-        self.volume_envelope.tick(&self.frame_sequencer);
+        if !self.enabled {
+            return;
+        }
+
+        self.volume_envelope.tick(frame_sequencer);
 
         self.frequency_timer -= 1;
         if self.frequency_timer == 0 {
@@ -88,13 +86,11 @@ impl NoiseVoice {
     }
 
     fn trigger(&mut self) {
-        self.enabled = true;
-
-        self.frame_sequencer.trigger();
-
-        if self.length_counter_enabled {
-            self.length_counter.trigger();
+        if self.dac_enabled {
+            self.enabled = true;
         }
+
+        self.length_counter.trigger();
 
         self.volume_envelope.trigger();
 
@@ -111,6 +107,22 @@ impl NoiseVoice {
         } << self.frequency_div_shift;
 
         self.lfsr = 0xFFFF;
+    }
+
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.dac_enabled = false;
+
+        self.length_counter_enabled = false;
+
+        self.volume_envelope.reset();
+
+        self.frequency_div = 0;
+        self.frequency_div_shift = 0;
+        self.frequency_timer = 0;
+
+        self.counter_width = 0;
+        self.lfsr = 0;
     }
 
     pub fn read_register_0(&self) -> u8 {
@@ -134,6 +146,9 @@ impl NoiseVoice {
     }
 
     pub fn write_register_2(&mut self, value: u8) {
+        self.dac_enabled = (value >> 3) & 0b0001_1111 != 0;
+        self.enabled = self.enabled && self.dac_enabled;
+
         self.volume_envelope.set_initial((value >> 4) & 0b1111);
         self.volume_envelope
             .set_direction(match (value >> 3) & 0b1 == 1 {

@@ -58,6 +58,14 @@ impl VolumeEnvelope {
         self.period_timer = self.period;
     }
 
+    pub fn reset(&mut self) {
+        self.initial = 0;
+        self.current = 0;
+        self.direction = EnvelopeDirection::Decrease;
+        self.period = 0;
+        self.period_timer = 0;
+    }
+
     pub fn current(&self) -> u8 {
         self.current
     }

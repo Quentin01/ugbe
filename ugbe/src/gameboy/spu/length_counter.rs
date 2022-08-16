@@ -3,7 +3,6 @@ use super::frame_sequencer::FrameSequencer;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LengthCounter<const NB_BITS: u8> {
     counter: u16,
-    value: u8,
 }
 
 impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
@@ -13,7 +12,6 @@ impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
     pub fn new() -> Self {
         Self {
             counter: Self::MAX_LENGTH,
-            value: 0,
         }
     }
 
@@ -28,7 +26,9 @@ impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
     }
 
     pub fn trigger(&mut self) {
-        self.counter = Self::MAX_LENGTH - self.value as u16;
+        if self.counter == 0 {
+            self.counter = Self::MAX_LENGTH;
+        }
     }
 
     pub fn value(&self) -> u16 {
@@ -36,6 +36,6 @@ impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
     }
 
     pub fn set_value(&mut self, value: u8) {
-        self.value = value & Self::VALUE_MASK;
+        self.counter = Self::MAX_LENGTH - (value & Self::VALUE_MASK) as u16;
     }
 }

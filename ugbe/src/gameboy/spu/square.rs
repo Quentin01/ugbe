@@ -10,7 +10,7 @@ const WAV_DUTY_TABLE: [u8; 4] = [0b00000001, 0b00000011, 0b00001111, 0b11111100]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SquareWaveVoice<const FREQUENCY_SWEEP: bool> {
     enabled: bool,
-    frame_sequencer: FrameSequencer,
+    dac_enabled: bool,
 
     length_counter: LengthCounter<6>,
     length_counter_enabled: bool,
@@ -28,7 +28,7 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     pub fn new() -> Self {
         Self {
             enabled: false,
-            frame_sequencer: FrameSequencer::new(),
+            dac_enabled: false,
 
             length_counter: LengthCounter::new(),
             length_counter_enabled: false,
@@ -43,24 +43,22 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         }
     }
 
-    pub fn tick(&mut self) {
-        if !self.enabled {
-            return;
-        }
-
-        self.frame_sequencer.tick();
-
+    pub fn tick(&mut self, frame_sequencer: &FrameSequencer) {
         if self.length_counter_enabled {
-            self.length_counter.tick(&self.frame_sequencer);
+            self.length_counter.tick(frame_sequencer);
             if self.length_counter.value() == 0 {
                 self.enabled = false;
             }
         }
 
-        self.volume_envelope.tick(&self.frame_sequencer);
+        if !self.enabled {
+            return;
+        }
+
+        self.volume_envelope.tick(frame_sequencer);
 
         if FREQUENCY_SWEEP {
-            self.frequency_sweep.tick(&self.frame_sequencer);
+            self.frequency_sweep.tick(frame_sequencer);
         }
 
         self.frequency_timer -= 1;
@@ -71,13 +69,11 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     }
 
     fn trigger(&mut self) {
-        self.enabled = true;
-
-        self.frame_sequencer.trigger();
-
-        if self.length_counter_enabled {
-            self.length_counter.trigger();
+        if self.dac_enabled {
+            self.enabled = true;
         }
+
+        self.length_counter.trigger();
 
         self.volume_envelope.trigger();
 
@@ -88,8 +84,23 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         self.frequency_timer = (2048 - self.frequency_sweep.current() as usize) * 4;
     }
 
+    pub fn reset(&mut self) {
+        self.enabled = false;
+        self.dac_enabled = false;
+
+        self.length_counter_enabled = false;
+
+        self.volume_envelope.reset();
+
+        self.frequency_sweep.reset();
+        self.frequency_timer = 2048 * 4;
+
+        self.wave_pattern_duty = 0;
+        self.duty_position = 0;
+    }
+
     pub fn read_register_0(&self) -> u8 {
-        if FREQUENCY_SWEEP {
+        if !FREQUENCY_SWEEP {
             return 0xFF;
         }
 
@@ -129,6 +140,9 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     }
 
     pub fn write_register_2(&mut self, value: u8) {
+        self.dac_enabled = (value >> 3) & 0b0001_1111 != 0;
+        self.enabled = self.enabled && self.dac_enabled;
+
         self.volume_envelope.set_initial((value >> 4) & 0b1111);
         self.volume_envelope
             .set_direction(match (value >> 3) & 0b1 != 0 {
@@ -139,7 +153,7 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     }
 
     pub fn read_register_3(&self) -> u8 {
-        (self.frequency_sweep.current() & 0xFF) as u8
+        0xFF
     }
 
     pub fn write_register_3(&mut self, value: u8) {
@@ -148,10 +162,7 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b10000000
-            | ((self.length_counter_enabled as u8) << 6)
-            | 0b0011_1000
-            | (((self.frequency_sweep.current() >> 8) as u8) & 0b0111)
+        0b10000000 | ((self.length_counter_enabled as u8) << 6) | 0b0011_1111
     }
 
     pub fn write_register_4(&mut self, value: u8) {
