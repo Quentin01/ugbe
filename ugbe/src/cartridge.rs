@@ -446,11 +446,15 @@ impl Kind {
 
     pub fn is_multi_cart(rom: &[u8]) -> bool {
         let nintendo_logo_count = (0..4)
-            .map(|idx| {
+            .filter_map(|idx| {
                 let start = idx * 0x40000 + 0x0104;
                 let end = start + NINTENDO_LOGO.len();
 
-                &rom[start..end]
+                if rom.len() <= start || rom.len() <= end {
+                    None
+                } else {
+                    Some(&rom[start..end])
+                }
             })
             .filter(|&possible_logo| possible_logo == NINTENDO_LOGO)
             .count();
