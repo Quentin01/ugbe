@@ -1,7 +1,9 @@
 use super::frame_sequencer::FrameSequencer;
 use super::frequency_sweep::{FrequencyDirection, FrequencySweep};
 use super::length_counter::LengthCounter;
+use super::sample::Voice as VoiceSample;
 use super::volume_envelope::{EnvelopeDirection, VolumeEnvelope};
+use super::Voice;
 
 const WAV_DUTY_TABLE: [u8; 4] = [0b00000001, 0b00000011, 0b00001111, 0b11111100];
 
@@ -86,25 +88,6 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         self.frequency_timer = (2048 - self.frequency_sweep.current() as usize) * 4;
     }
 
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    pub fn sample(&self, shift_to_avoid_precision: u8) -> i32 {
-        if !self.enabled {
-            return 0;
-        }
-
-        let duty = WAV_DUTY_TABLE[self.wave_pattern_duty as usize];
-        let duty = (duty >> (7 - self.duty_position)) & 0b1 == 1;
-
-        if duty {
-            (self.volume_envelope.current() as i32) << shift_to_avoid_precision
-        } else {
-            (-(self.volume_envelope.current() as i32)) << shift_to_avoid_precision
-        }
-    }
-
     pub fn read_register_0(&self) -> u8 {
         if FREQUENCY_SWEEP {
             return 0xFF;
@@ -179,5 +162,19 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         if (value >> 7) & 0b1 == 1 {
             self.trigger();
         }
+    }
+}
+
+impl<const FREQUENCY_SWEEP: bool> Voice for SquareWaveVoice<FREQUENCY_SWEEP> {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn sample(&self) -> VoiceSample {
+        let duty = WAV_DUTY_TABLE[self.wave_pattern_duty as usize];
+        let duty = (duty >> (7 - self.duty_position)) & 0b1 == 1;
+
+        let amp = duty as u8;
+        VoiceSample::new(amp * self.volume_envelope.current())
     }
 }

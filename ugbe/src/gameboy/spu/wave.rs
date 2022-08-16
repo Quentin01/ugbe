@@ -1,5 +1,7 @@
 use super::frame_sequencer::FrameSequencer;
 use super::length_counter::LengthCounter;
+use super::sample::Voice as VoiceSample;
+use super::Voice;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct WaveVoice {
@@ -70,33 +72,6 @@ impl WaveVoice {
         self.ram_idx = 0;
     }
 
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    pub fn sample(&self, shift_to_avoid_precision: u8) -> i32 {
-        if !self.enabled {
-            return 0;
-        }
-
-        let amp = if self.ram_idx % 2 == 0 {
-            (self.ram[(self.ram_idx / 2) as usize] >> 4) & 0b1111
-        } else {
-            self.ram[(self.ram_idx / 2) as usize] & 0b1111
-        };
-
-        let volume_shift = match self.volume_shift {
-            0b00 => 4 + shift_to_avoid_precision,
-            0b01 => 0,
-            0b10 => 1,
-            0b11 => 2,
-            _ => unreachable!(),
-        };
-
-        let sample = ((amp as i32) << shift_to_avoid_precision) >> volume_shift;
-        (sample * 2) - (((0xF * 2) << shift_to_avoid_precision) / 2)
-    }
-
     pub fn read_register_0(&self) -> u8 {
         (self.enabled as u8) << 7 | 0b1111111
     }
@@ -151,5 +126,29 @@ impl WaveVoice {
 
     pub fn write_ram(&mut self, address: u16, value: u8) {
         self.ram[address as usize] = value;
+    }
+}
+
+impl Voice for WaveVoice {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn sample(&self) -> VoiceSample {
+        let amp = if self.ram_idx % 2 == 0 {
+            (self.ram[(self.ram_idx / 2) as usize] >> 4) & 0b1111
+        } else {
+            self.ram[(self.ram_idx / 2) as usize] & 0b1111
+        };
+
+        let volume_shift = match self.volume_shift {
+            0b00 => 4,
+            0b01 => 0,
+            0b10 => 1,
+            0b11 => 2,
+            _ => unreachable!(),
+        };
+
+        VoiceSample::new(amp >> volume_shift)
     }
 }

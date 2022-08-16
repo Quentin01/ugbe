@@ -2,27 +2,25 @@ mod frame_sequencer;
 mod frequency_sweep;
 mod length_counter;
 mod noise;
+mod sample;
 mod square;
 mod volume_envelope;
 mod wave;
 
+pub use sample::Output as OutputSample;
+pub type SampleFrame = sample::Frame<OutputSample>;
+
 pub const SAMPLE_RATE: usize = super::clock::FREQUENCY / 2;
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SampleFrame {
-    left: i32,
-    right: i32,
+trait Voice {
+    fn enabled(&self) -> bool;
+    fn sample(&self) -> sample::Voice;
 }
 
-impl SampleFrame {
-    pub fn left(&self) -> i32 {
-        self.left
-    }
-
-    pub fn right(&self) -> i32 {
-        self.right
-    }
-}
+type Voice1 = square::SquareWaveVoice<true>;
+type Voice2 = square::SquareWaveVoice<false>;
+type Voice3 = wave::WaveVoice;
+type Voice4 = noise::NoiseVoice;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Spu {
@@ -30,19 +28,19 @@ pub struct Spu {
     left_volume: u8,
     right_volume: u8,
 
-    voice1: square::SquareWaveVoice<true>,
+    voice1: Voice1,
     voice1_left_enabled: bool,
     voice1_right_enabled: bool,
 
-    voice2: square::SquareWaveVoice<false>,
+    voice2: Voice2,
     voice2_left_enabled: bool,
     voice2_right_enabled: bool,
 
-    voice3: wave::WaveVoice,
+    voice3: Voice3,
     voice3_left_enabled: bool,
     voice3_right_enabled: bool,
 
-    voice4: noise::NoiseVoice,
+    voice4: Voice4,
     voice4_left_enabled: bool,
     voice4_right_enabled: bool,
 }
@@ -54,8 +52,6 @@ impl Default for Spu {
 }
 
 impl Spu {
-    const SHIFT_FOR_PRECISION: u8 = 4;
-
     pub fn new() -> Self {
         Self {
             enabled: false,
@@ -90,68 +86,76 @@ impl Spu {
         }
     }
 
+    fn dac(voice: &impl Voice) -> sample::Dac {
+        if !voice.enabled() {
+            return sample::Dac::silence();
+        }
+
+        sample::Dac::from_voice(voice.sample())
+    }
+
+    fn mix(&self) -> sample::Frame<sample::Dac> {
+        let mut left = sample::Dac::silence();
+        let mut right = sample::Dac::silence();
+
+        let voice1 = Self::dac(&self.voice1);
+        let voice2 = Self::dac(&self.voice2);
+        let voice3 = Self::dac(&self.voice3);
+        let voice4 = Self::dac(&self.voice4);
+
+        if self.voice1_left_enabled {
+            left += voice1 / 4.0;
+        }
+
+        if self.voice1_right_enabled {
+            right += voice1 / 4.0;
+        }
+
+        if self.voice2_left_enabled {
+            left += voice2 / 4.0;
+        }
+
+        if self.voice2_right_enabled {
+            right += voice2 / 4.0;
+        }
+
+        if self.voice3_left_enabled {
+            left += voice3 / 4.0;
+        }
+
+        if self.voice3_right_enabled {
+            right += voice3 / 4.0;
+        }
+
+        if self.voice4_left_enabled {
+            left += voice4 / 4.0;
+        }
+
+        if self.voice4_right_enabled {
+            right += voice4 / 4.0;
+        }
+
+        sample::Frame::new(left, right)
+    }
+
+    fn amplify(
+        &self,
+        sample_frame: sample::Frame<sample::Dac>,
+    ) -> sample::Frame<sample::Amplified> {
+        sample::Frame::new(
+            sample::Amplified::from_dac(sample_frame.left(), self.left_volume),
+            sample::Amplified::from_dac(sample_frame.right(), self.right_volume),
+        )
+    }
+
     pub fn sample_frame(&self) -> SampleFrame {
         if self.enabled {
-            let mut left = 0;
-            let mut right = 0;
+            let sample_frame = self.amplify(self.mix());
 
-            if self.voice1.enabled() {
-                if self.voice1_left_enabled {
-                    left += (self.voice1.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.left_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-
-                if self.voice1_right_enabled {
-                    right += (self.voice1.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.right_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-            }
-
-            if self.voice2.enabled() {
-                if self.voice2_left_enabled {
-                    left += (self.voice2.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.left_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-
-                if self.voice2_right_enabled {
-                    right += (self.voice2.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.right_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-            }
-
-            if self.voice3.enabled() {
-                if self.voice3_left_enabled {
-                    left += (self.voice3.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.left_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-
-                if self.voice3_right_enabled {
-                    right += (self.voice3.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.right_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-            }
-
-            if self.voice4.enabled() {
-                if self.voice4_left_enabled {
-                    left += (self.voice4.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.left_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-
-                if self.voice4_right_enabled {
-                    right += (self.voice4.sample(Self::SHIFT_FOR_PRECISION)
-                        << (self.right_volume + 1))
-                        >> Self::SHIFT_FOR_PRECISION;
-                }
-            }
-
-            SampleFrame { left, right }
+            sample::Frame::new(
+                OutputSample::from_amplified(sample_frame.left()),
+                OutputSample::from_amplified(sample_frame.right()),
+            )
         } else {
             SampleFrame::default()
         }

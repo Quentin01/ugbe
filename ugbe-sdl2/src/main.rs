@@ -22,6 +22,7 @@ const TEXTURE_PITCH: usize = (TEXTURE_WIDTH * BYTES_PER_PIXEL) as usize;
 const SAMPLE_RATE: usize = 48000;
 const SAMPLE_COUNT_PER_EVENT: usize = 1024;
 const SAMPLE_BUFFER_SIZE: u16 = 512;
+const VOLUME_SCALE: i32 = 100;
 
 #[derive(Debug)]
 struct SdlError(String);
@@ -252,17 +253,20 @@ fn main() -> Result<()> {
                         let mut audio_buff_clock_time = 0;
 
                         for sample_frame in sample_frames {
+                            let sample_left = sample_frame.left().value() as i32 * VOLUME_SCALE;
+                            let sample_right = sample_frame.right().value() as i32 * VOLUME_SCALE;
+
                             audio_buff_left.add_delta(
                                 audio_buff_clock_time,
-                                sample_frame.left() - audio_buff_previous_left,
+                                sample_left - audio_buff_previous_left,
                             );
-                            audio_buff_previous_left = sample_frame.left() as i32;
+                            audio_buff_previous_left = sample_left;
 
                             audio_buff_right.add_delta(
                                 audio_buff_clock_time,
-                                sample_frame.right() - audio_buff_previous_right,
+                                sample_right - audio_buff_previous_right,
                             );
-                            audio_buff_previous_right = sample_frame.right() as i32;
+                            audio_buff_previous_right = sample_right;
 
                             audio_buff_clock_time += 1;
                         }

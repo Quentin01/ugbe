@@ -1,6 +1,8 @@
 use super::frame_sequencer::FrameSequencer;
 use super::length_counter::LengthCounter;
+use super::sample::Voice as VoiceSample;
 use super::volume_envelope::{EnvelopeDirection, VolumeEnvelope};
+use super::Voice;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct NoiseVoice {
@@ -111,22 +113,6 @@ impl NoiseVoice {
         self.lfsr = 0xFFFF;
     }
 
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    pub fn sample(&self, shift_to_avoid_precision: u8) -> i32 {
-        if !self.enabled {
-            return 0;
-        }
-
-        if self.lfsr & 0b1 == 0 {
-            (self.volume_envelope.current() as i32) << shift_to_avoid_precision
-        } else {
-            (-(self.volume_envelope.current() as i32)) << shift_to_avoid_precision
-        }
-    }
-
     pub fn read_register_0(&self) -> u8 {
         0xFF
     }
@@ -179,5 +165,16 @@ impl NoiseVoice {
         if (value >> 7) & 0b1 == 1 {
             self.trigger();
         }
+    }
+}
+
+impl Voice for NoiseVoice {
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn sample(&self) -> VoiceSample {
+        let amp = (self.lfsr & 0b1) as u8;
+        VoiceSample::new(amp * self.volume_envelope.current())
     }
 }
