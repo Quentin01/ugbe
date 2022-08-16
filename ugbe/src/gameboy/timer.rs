@@ -1,17 +1,18 @@
 use super::components::{InterruptKind, InterruptLine};
 
-#[derive(Debug)]
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct TAC(u8);
 
 impl From<u8> for TAC {
     fn from(value: u8) -> Self {
-        Self(value | 0b11111000)
+        Self(value | 0b1111_1000)
     }
 }
 
 impl From<&TAC> for u8 {
     fn from(value: &TAC) -> Self {
-        value.0 | 0b11111000
+        value.0 | 0b1111_1000
     }
 }
 
@@ -31,7 +32,7 @@ impl TAC {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Timer {
     internal_counter: u16,
     control: TAC,

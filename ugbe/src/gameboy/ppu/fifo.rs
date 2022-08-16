@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Fifo<T: Copy + Clone, const SIZE: usize = 10> {
     data: [Option<T>; SIZE],
     start: usize,
@@ -21,7 +21,7 @@ impl<T: Copy + Clone, const SIZE: usize> Fifo<T, SIZE> {
     }
 
     pub fn push(&mut self, data: T) {
-        assert!(
+        debug_assert!(
             self.size != SIZE,
             "Trying to push to a full FIFO (start={}, size={})",
             self.start,
@@ -34,7 +34,7 @@ impl<T: Copy + Clone, const SIZE: usize> Fifo<T, SIZE> {
     }
 
     pub fn pop(&mut self) -> T {
-        assert!(
+        debug_assert!(
             self.size != 0,
             "Trying to pop from a FIFO without any more values to pop (start={}, size={})",
             self.start,

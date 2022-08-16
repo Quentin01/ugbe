@@ -330,12 +330,12 @@ impl Spu {
     }
 
     pub fn read_nr50(&self) -> u8 {
-        ((self.left_volume & 0b111) << 4) | (self.right_volume & 0b111)
+        ((self.left_volume & 0b0111) << 4) | (self.right_volume & 0b0111)
     }
 
     pub fn write_nr50(&mut self, value: u8) {
-        self.left_volume = (value >> 4) & 0b111;
-        self.right_volume = value & 0b111;
+        self.left_volume = (value >> 4) & 0b0111;
+        self.right_volume = value & 0b0111;
     }
 
     pub fn read_nr51(&self) -> u8 {
@@ -350,15 +350,15 @@ impl Spu {
     }
 
     pub fn write_nr51(&mut self, value: u8) {
-        self.voice4_left_enabled = (value >> 7) & 0b1 == 1;
-        self.voice3_left_enabled = (value >> 6) & 0b1 == 1;
-        self.voice2_left_enabled = (value >> 5) & 0b1 == 1;
-        self.voice1_left_enabled = (value >> 4) & 0b1 == 1;
+        self.voice4_left_enabled = (value >> 7) & 0b1 != 0;
+        self.voice3_left_enabled = (value >> 6) & 0b1 != 0;
+        self.voice2_left_enabled = (value >> 5) & 0b1 != 0;
+        self.voice1_left_enabled = (value >> 4) & 0b1 != 0;
 
-        self.voice4_right_enabled = (value >> 3) & 0b1 == 1;
-        self.voice3_right_enabled = (value >> 2) & 0b1 == 1;
-        self.voice2_right_enabled = (value >> 1) & 0b1 == 1;
-        self.voice1_right_enabled = value & 0b1 == 1;
+        self.voice4_right_enabled = (value >> 3) & 0b1 != 0;
+        self.voice3_right_enabled = (value >> 2) & 0b1 != 0;
+        self.voice2_right_enabled = (value >> 1) & 0b1 != 0;
+        self.voice1_right_enabled = value & 0b1 != 0;
     }
 
     pub fn read_nr52(&self) -> u8 {

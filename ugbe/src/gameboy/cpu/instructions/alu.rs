@@ -1,8 +1,9 @@
-pub trait AluOp {
+pub trait ALUOp {
     const STR: &'static str;
 }
 
-pub struct AluOpResult<Value> {
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ALUOpResult<Value> {
     pub value: Option<Value>,
     pub zf: Option<bool>,
     pub nf: Option<bool>,
@@ -10,29 +11,30 @@ pub struct AluOpResult<Value> {
     pub cf: Option<bool>,
 }
 
-pub trait AluOneOp<Value>: AluOp {
-    fn execute(value: Value, nf: bool, hf: bool, cf: bool) -> AluOpResult<Value>;
+pub trait ALUOneOp<Value>: ALUOp {
+    fn execute(value: Value, nf: bool, hf: bool, cf: bool) -> ALUOpResult<Value>;
 }
 
-pub trait AluTwoOp<DstValue, SrcValue>: AluOp {
-    fn execute(a: DstValue, b: SrcValue, cf: bool) -> AluOpResult<DstValue>;
+pub trait ALUTwoOp<DstValue, SrcValue>: ALUOp {
+    fn execute(a: DstValue, b: SrcValue, cf: bool) -> ALUOpResult<DstValue>;
 }
 
-pub trait AluBitOp<const BIT_POS: u8>: AluOp {
-    fn execute(value: u8) -> AluOpResult<u8>;
+pub trait AluBitOp<const BIT_POS: u8>: ALUOp {
+    fn execute(value: u8) -> ALUOpResult<u8>;
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Inc {}
 
-impl AluOp for Inc {
+impl ALUOp for Inc {
     const STR: &'static str = "INC";
 }
 
-impl AluOneOp<u8> for Inc {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for Inc {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value.wrapping_add(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -42,11 +44,11 @@ impl AluOneOp<u8> for Inc {
     }
 }
 
-impl AluOneOp<u16> for Inc {
-    fn execute(value: u16, _: bool, _: bool, _: bool) -> AluOpResult<u16> {
+impl ALUOneOp<u16> for Inc {
+    fn execute(value: u16, _: bool, _: bool, _: bool) -> ALUOpResult<u16> {
         let new_value = value.wrapping_add(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: None,
             nf: None,
@@ -56,17 +58,18 @@ impl AluOneOp<u16> for Inc {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Dec {}
 
-impl AluOp for Dec {
+impl ALUOp for Dec {
     const STR: &'static str = "DEC";
 }
 
-impl AluOneOp<u8> for Dec {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for Dec {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value.wrapping_sub(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(true),
@@ -76,11 +79,11 @@ impl AluOneOp<u8> for Dec {
     }
 }
 
-impl AluOneOp<u16> for Dec {
-    fn execute(value: u16, _: bool, _: bool, _: bool) -> AluOpResult<u16> {
+impl ALUOneOp<u16> for Dec {
+    fn execute(value: u16, _: bool, _: bool, _: bool) -> ALUOpResult<u16> {
         let new_value = value.wrapping_sub(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: None,
             nf: None,
@@ -90,17 +93,19 @@ impl AluOneOp<u16> for Dec {
     }
 }
 
-pub struct Rlc {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RLC {}
 
-impl AluOp for Rlc {
+impl ALUOp for RLC {
     const STR: &'static str = "RLC";
 }
 
-impl AluOneOp<u8> for Rlc {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for RLC {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value.rotate_left(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -110,17 +115,18 @@ impl AluOneOp<u8> for Rlc {
     }
 }
 
-pub struct Rl {}
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RL {}
 
-impl AluOp for Rl {
+impl ALUOp for RL {
     const STR: &'static str = "RL";
 }
 
-impl AluOneOp<u8> for Rl {
-    fn execute(value: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for RL {
+    fn execute(value: u8, _: bool, _: bool, cf: bool) -> ALUOpResult<u8> {
         let new_value = (value << 1) | (cf as u8);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -130,17 +136,19 @@ impl AluOneOp<u8> for Rl {
     }
 }
 
-pub struct Rrc {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RRC {}
 
-impl AluOp for Rrc {
+impl ALUOp for RRC {
     const STR: &'static str = "RRC";
 }
 
-impl AluOneOp<u8> for Rrc {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for RRC {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value.rotate_right(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -150,17 +158,19 @@ impl AluOneOp<u8> for Rrc {
     }
 }
 
-pub struct Rr {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RR {}
 
-impl AluOp for Rr {
+impl ALUOp for RR {
     const STR: &'static str = "RR";
 }
 
-impl AluOneOp<u8> for Rr {
-    fn execute(value: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for RR {
+    fn execute(value: u8, _: bool, _: bool, cf: bool) -> ALUOpResult<u8> {
         let new_value = (value >> 1) | ((cf as u8) << 7);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -170,17 +180,19 @@ impl AluOneOp<u8> for Rr {
     }
 }
 
-pub struct Sla {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SLA {}
 
-impl AluOp for Sla {
+impl ALUOp for SLA {
     const STR: &'static str = "SLA";
 }
 
-impl AluOneOp<u8> for Sla {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for SLA {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value << 1;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -190,17 +202,19 @@ impl AluOneOp<u8> for Sla {
     }
 }
 
-pub struct Sra {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SRA {}
 
-impl AluOp for Sra {
+impl ALUOp for SRA {
     const STR: &'static str = "SRA";
 }
 
-impl AluOneOp<u8> for Sra {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for SRA {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value >> 1 | (value & 0x80);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -210,17 +224,18 @@ impl AluOneOp<u8> for Sra {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Swap {}
 
-impl AluOp for Swap {
+impl ALUOp for Swap {
     const STR: &'static str = "SWAP";
 }
 
-impl AluOneOp<u8> for Swap {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for Swap {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = (value >> 4) | (value << 4);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -230,17 +245,19 @@ impl AluOneOp<u8> for Swap {
     }
 }
 
-pub struct Srl {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SRL {}
 
-impl AluOp for Srl {
+impl ALUOp for SRL {
     const STR: &'static str = "SRL";
 }
 
-impl AluOneOp<u8> for Srl {
-    fn execute(value: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for SRL {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let new_value = value >> 1;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(new_value),
             zf: Some(new_value == 0),
             nf: Some(false),
@@ -250,74 +267,84 @@ impl AluOneOp<u8> for Srl {
     }
 }
 
-pub struct RlcA {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RLCA {}
 
-impl AluOp for RlcA {
+impl ALUOp for RLCA {
     const STR: &'static str = "RLCA";
 }
 
-impl AluOneOp<u8> for RlcA {
-    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for RLCA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             zf: Some(false),
-            ..Rlc::execute(value, nf, hf, cf)
+            ..RLC::execute(value, nf, hf, cf)
         }
     }
 }
 
-pub struct RrcA {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RRCA {}
 
-impl AluOp for RrcA {
+impl ALUOp for RRCA {
     const STR: &'static str = "RRCA";
 }
 
-impl AluOneOp<u8> for RrcA {
-    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for RRCA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             zf: Some(false),
-            ..Rrc::execute(value, nf, hf, cf)
+            ..RRC::execute(value, nf, hf, cf)
         }
     }
 }
 
-pub struct RlA {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RLA {}
 
-impl AluOp for RlA {
+impl ALUOp for RLA {
     const STR: &'static str = "RLA";
 }
 
-impl AluOneOp<u8> for RlA {
-    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for RLA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             zf: Some(false),
-            ..Rl::execute(value, nf, hf, cf)
+            ..RL::execute(value, nf, hf, cf)
         }
     }
 }
 
-pub struct RrA {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct RRA {}
 
-impl AluOp for RrA {
+impl ALUOp for RRA {
     const STR: &'static str = "RRA";
 }
 
-impl AluOneOp<u8> for RrA {
-    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for RRA {
+    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             zf: Some(false),
-            ..Rr::execute(value, nf, hf, cf)
+            ..RR::execute(value, nf, hf, cf)
         }
     }
 }
 
-pub struct Daa {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DAA {}
 
-impl AluOp for Daa {
+impl ALUOp for DAA {
     const STR: &'static str = "DAA";
 }
 
-impl AluOneOp<u8> for Daa {
-    fn execute(mut value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for DAA {
+    fn execute(mut value: u8, nf: bool, hf: bool, cf: bool) -> ALUOpResult<u8> {
         let mut new_carry = false;
         if !nf {
             if cf || value > 0x99 {
@@ -334,7 +361,7 @@ impl AluOneOp<u8> for Daa {
             value = value.wrapping_add(0xfa);
         }
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: None,
@@ -344,17 +371,19 @@ impl AluOneOp<u8> for Daa {
     }
 }
 
-pub struct Cpl {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CPL {}
 
-impl AluOp for Cpl {
+impl ALUOp for CPL {
     const STR: &'static str = "CPL";
 }
 
-impl AluOneOp<u8> for Cpl {
-    fn execute(value: u8, nf: bool, hf: bool, cf: bool) -> AluOpResult<u8> {
+impl ALUOneOp<u8> for CPL {
+    fn execute(value: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
         let value = !value;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: None,
             nf: Some(true),
@@ -364,15 +393,17 @@ impl AluOneOp<u8> for Cpl {
     }
 }
 
-pub struct Scf {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SCF {}
 
-impl AluOp for Scf {
+impl ALUOp for SCF {
     const STR: &'static str = "SCF";
 }
 
-impl AluOneOp<u8> for Scf {
-    fn execute(_: u8, _: bool, _: bool, _: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for SCF {
+    fn execute(_: u8, _: bool, _: bool, _: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: None,
             zf: None,
             nf: Some(false),
@@ -382,15 +413,17 @@ impl AluOneOp<u8> for Scf {
     }
 }
 
-pub struct Ccf {}
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CCF {}
 
-impl AluOp for Ccf {
+impl ALUOp for CCF {
     const STR: &'static str = "CCF";
 }
 
-impl AluOneOp<u8> for Ccf {
-    fn execute(_: u8, _: bool, _: bool, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUOneOp<u8> for CCF {
+    fn execute(_: u8, _: bool, _: bool, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: None,
             zf: None,
             nf: Some(false),
@@ -400,17 +433,18 @@ impl AluOneOp<u8> for Ccf {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Add {}
 
-impl AluOp for Add {
+impl ALUOp for Add {
     const STR: &'static str = "ADD";
 }
 
-impl AluTwoOp<u8, u8> for Add {
-    fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for Add {
+    fn execute(a: u8, b: u8, _: bool) -> ALUOpResult<u8> {
         let (value, new_carry) = a.overflowing_add(b);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
@@ -420,13 +454,13 @@ impl AluTwoOp<u8, u8> for Add {
     }
 }
 
-impl AluTwoOp<u16, u16> for Add {
-    fn execute(a: u16, b: u16, _: bool) -> AluOpResult<u16> {
-        let (value, new_carry) = a.overflowing_add(b);
+impl ALUTwoOp<u16, u16> for Add {
+    fn execute(a: u16, b: u16, _: bool) -> ALUOpResult<u16> {
+        let (value, _) = a.overflowing_add(b);
 
         let hf_mask = (1u16 << 11) | (1u16 << 11).wrapping_sub(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: None,
             nf: Some(false),
@@ -436,15 +470,15 @@ impl AluTwoOp<u16, u16> for Add {
     }
 }
 
-impl AluTwoOp<u16, i8> for Add {
-    fn execute(a: u16, b: i8, _: bool) -> AluOpResult<u16> {
+impl ALUTwoOp<u16, i8> for Add {
+    fn execute(a: u16, b: i8, _: bool) -> ALUOpResult<u16> {
         let b = b as u16;
         let value = a.wrapping_add(b);
 
         let hf_mask = (1u16 << 3) | (1u16 << 3).wrapping_sub(1);
         let cf_mask = (1u16 << 7) | (1u16 << 7).wrapping_sub(1);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(false),
             nf: Some(false),
@@ -454,17 +488,18 @@ impl AluTwoOp<u16, i8> for Add {
     }
 }
 
-pub struct Adc {}
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AdC {}
 
-impl AluOp for Adc {
+impl ALUOp for AdC {
     const STR: &'static str = "ADC";
 }
 
-impl AluTwoOp<u8, u8> for Adc {
-    fn execute(a: u8, b: u8, cf: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for AdC {
+    fn execute(a: u8, b: u8, cf: bool) -> ALUOpResult<u8> {
         let value = a.wrapping_add(b).wrapping_add(cf as u8);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
@@ -474,17 +509,18 @@ impl AluTwoOp<u8, u8> for Adc {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Sub {}
 
-impl AluOp for Sub {
+impl ALUOp for Sub {
     const STR: &'static str = "SUB";
 }
 
-impl AluTwoOp<u8, u8> for Sub {
-    fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for Sub {
+    fn execute(a: u8, b: u8, _: bool) -> ALUOpResult<u8> {
         let value = a.wrapping_sub(b);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(true),
@@ -494,17 +530,18 @@ impl AluTwoOp<u8, u8> for Sub {
     }
 }
 
-pub struct Sbc {}
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SbC {}
 
-impl AluOp for Sbc {
+impl ALUOp for SbC {
     const STR: &'static str = "SBC";
 }
 
-impl AluTwoOp<u8, u8> for Sbc {
-    fn execute(a: u8, b: u8, cf: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for SbC {
+    fn execute(a: u8, b: u8, cf: bool) -> ALUOpResult<u8> {
         let value = a.wrapping_sub(b).wrapping_sub(cf as u8);
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(true),
@@ -514,17 +551,18 @@ impl AluTwoOp<u8, u8> for Sbc {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct And {}
 
-impl AluOp for And {
+impl ALUOp for And {
     const STR: &'static str = "AND";
 }
 
-impl AluTwoOp<u8, u8> for And {
-    fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for And {
+    fn execute(a: u8, b: u8, _: bool) -> ALUOpResult<u8> {
         let value = a & b;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
@@ -534,17 +572,18 @@ impl AluTwoOp<u8, u8> for And {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Xor {}
 
-impl AluOp for Xor {
+impl ALUOp for Xor {
     const STR: &'static str = "XOR";
 }
 
-impl AluTwoOp<u8, u8> for Xor {
-    fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for Xor {
+    fn execute(a: u8, b: u8, _: bool) -> ALUOpResult<u8> {
         let value = a ^ b;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
@@ -554,17 +593,18 @@ impl AluTwoOp<u8, u8> for Xor {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Or {}
 
-impl AluOp for Or {
+impl ALUOp for Or {
     const STR: &'static str = "OR";
 }
 
-impl AluTwoOp<u8, u8> for Or {
-    fn execute(a: u8, b: u8, _: bool) -> AluOpResult<u8> {
+impl ALUTwoOp<u8, u8> for Or {
+    fn execute(a: u8, b: u8, _: bool) -> ALUOpResult<u8> {
         let value = a | b;
 
-        AluOpResult {
+        ALUOpResult {
             value: Some(value),
             zf: Some(value == 0),
             nf: Some(false),
@@ -574,30 +614,32 @@ impl AluTwoOp<u8, u8> for Or {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Cp {}
 
-impl AluOp for Cp {
+impl ALUOp for Cp {
     const STR: &'static str = "CP";
 }
 
-impl AluTwoOp<u8, u8> for Cp {
-    fn execute(a: u8, b: u8, cf: bool) -> AluOpResult<u8> {
-        AluOpResult {
+impl ALUTwoOp<u8, u8> for Cp {
+    fn execute(a: u8, b: u8, cf: bool) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: None,
             ..Sub::execute(a, b, cf)
         }
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Bit {}
 
-impl AluOp for Bit {
+impl ALUOp for Bit {
     const STR: &'static str = "BIT";
 }
 
 impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Bit {
-    fn execute(value: u8) -> AluOpResult<u8> {
-        AluOpResult {
+    fn execute(value: u8) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: None,
             zf: Some(((value >> BIT_POS) & 1) == 0),
             nf: Some(false),
@@ -607,15 +649,16 @@ impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Bit {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Set {}
 
-impl AluOp for Set {
+impl ALUOp for Set {
     const STR: &'static str = "SET";
 }
 
 impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Set {
-    fn execute(value: u8) -> AluOpResult<u8> {
-        AluOpResult {
+    fn execute(value: u8) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: Some(value | (1 << BIT_POS)),
             zf: None,
             nf: None,
@@ -625,15 +668,16 @@ impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Set {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Res {}
 
-impl AluOp for Res {
+impl ALUOp for Res {
     const STR: &'static str = "RES";
 }
 
 impl<const BIT_POS: u8> AluBitOp<BIT_POS> for Res {
-    fn execute(value: u8) -> AluOpResult<u8> {
-        AluOpResult {
+    fn execute(value: u8) -> ALUOpResult<u8> {
+        ALUOpResult {
             value: Some(value & (!(1 << BIT_POS))),
             zf: None,
             nf: None,

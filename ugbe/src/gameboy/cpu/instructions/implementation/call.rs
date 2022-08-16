@@ -8,6 +8,7 @@ use super::super::condition::Condition;
 use super::super::operands::{Operand, OperandIn, OperandReadExecution, OperandReadExecutionState};
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Call<Cond, Op>
 where
     Cond: Condition + Send + Sync + 'static,
@@ -34,7 +35,7 @@ where
     Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        if Cond::STR.len() == 0 {
+        if Cond::is_none() {
             format!("CALL {}", Op::str()).into()
         } else {
             format!("CALL {}, {}", Cond::STR, Op::str()).into()

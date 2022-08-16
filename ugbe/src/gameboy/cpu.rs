@@ -22,6 +22,7 @@ enum State {
     Halted,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum InterruptDispatchState {
     Start,
     DecrementingSP,
@@ -31,6 +32,7 @@ enum InterruptDispatchState {
     Complete,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum InterruptDispatchExecutionState {
     Yield(MemoryOperation),
     Complete,
@@ -100,7 +102,7 @@ impl InterruptDispatchState {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CpuOperation {
     EnableInterrupt,
     EnableInterruptNow,
@@ -118,8 +120,7 @@ pub struct Cpu {
 impl Cpu {
     pub fn new() -> Self {
         Self {
-            // TODO: Put the right default value for registers
-            registers: Registers::default(),
+            registers: Registers::new(),
             state: State::NotStarted,
             ime: true,
             enable_ime: false,

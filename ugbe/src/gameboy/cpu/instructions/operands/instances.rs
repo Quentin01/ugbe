@@ -14,6 +14,7 @@ macro_rules! define_immediate {
     ($size:literal) => {
         paste! {
             #[allow(dead_code)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct [<Imm $size>] {}
 
             impl Operand for [<Imm $size>] {
@@ -49,6 +50,7 @@ macro_rules! define_offset {
     ($size:literal) => {
         paste! {
             #[allow(dead_code)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct [<Off $size>] {}
 
             impl Operand for [<Off $size>] {
@@ -77,6 +79,7 @@ macro_rules! define_register_8 {
     ($reg:ident) => {
         paste! {
             #[allow(dead_code)]
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct [<$reg:upper>] {}
 
             impl Operand for [<$reg:upper>] {
@@ -128,6 +131,7 @@ define_register_8!(L);
 macro_rules! define_register_16 {
     ($reg:ident) => {
         paste! {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
             pub struct [<$reg:upper>] {}
 
             impl Operand for [<$reg:upper>] {
@@ -180,6 +184,7 @@ define_register_16!(DE);
 define_register_16!(HL);
 define_register_16!(SP);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SPPlusOff8 {}
 
 impl Operand for SPPlusOff8 {

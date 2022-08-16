@@ -10,6 +10,7 @@ use super::super::operands::{
 };
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Ld<Dst, Src, const WAIT_ONE_EXTRA_CYCLE: bool = false>
 where
     Src: Operand + OperandIn + Send + Sync + 'static,

@@ -4,14 +4,14 @@ mod alu;
 mod condition;
 mod operands;
 
-use super::super::components::{Mmu, MmuContext};
+use super::super::components::{MMUContext, Mmu};
 use super::registers::Registers;
 use super::MemoryOperation;
 
 pub trait Instruction: Send + Sync {
     fn raw_desc(&self) -> Cow<'static, str>;
 
-    fn desc(&self, pc: u16, mmu: &dyn Mmu, mmu_ctx: &MmuContext) -> Cow<'static, str> {
+    fn desc(&self, pc: u16, mmu: &dyn Mmu, mmu_ctx: &MMUContext) -> Cow<'static, str> {
         let raw_desc = self.raw_desc();
 
         if raw_desc.contains("u8") {
@@ -51,7 +51,7 @@ pub trait Instruction: Send + Sync {
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InstructionExecutionState {
     YieldMemoryOperation(MemoryOperation),
     YieldCpuOperation(super::CpuOperation),

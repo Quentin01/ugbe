@@ -36,18 +36,18 @@ const TABLE_CC: [&str; 4] = [
 ];
 
 const TABLE_ALU: [&str; 8] = [
-    "alu::Add", "alu::Adc", "alu::Sub", "alu::Sbc", "alu::And", "alu::Xor", "alu::Or", "alu::Cp",
+    "alu::Add", "alu::AdC", "alu::Sub", "alu::SbC", "alu::And", "alu::Xor", "alu::Or", "alu::Cp",
 ];
 
 const TABLE_ROT: [&str; 8] = [
-    "alu::Rlc",
-    "alu::Rrc",
-    "alu::Rl",
-    "alu::Rr",
-    "alu::Sla",
-    "alu::Sra",
+    "alu::RLC",
+    "alu::RRC",
+    "alu::RL",
+    "alu::RR",
+    "alu::SLA",
+    "alu::SRA",
     "alu::Swap",
-    "alu::Srl",
+    "alu::SRL",
 ];
 
 /// Decode an instruction depending on its opcode
@@ -67,7 +67,8 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 "&implementation::Ld::<operands::DerefImm16ToU16, operands::SP>::new()".into()
             } else if y == 2 {
                 // TODO: STOP
-                format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                // format!("&implementation::Invalid::<{opcode}, false>::new()").into()
+                "&implementation::Nop::new()".into()
             } else if y == 3 {
                 "&implementation::Jr::<condition::None, operands::Off8>::new()".into()
             } else if (4..=7).contains(&y) {
@@ -88,7 +89,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
                 .into()
             } else if q == 1 {
                 format!(
-                    "&implementation::AluTwo::<alu::Add, operands::HL, {}>::new()",
+                    "&implementation::ALUTwo::<alu::Add, operands::HL, {}>::new()",
                     TABLE_RP[p as usize]
                 )
                 .into()
@@ -126,13 +127,13 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         } else if z == 3 {
             if q == 0 {
                 format!(
-                    "&implementation::AluOne::<alu::Inc, {}>::new()",
+                    "&implementation::ALUOne::<alu::Inc, {}>::new()",
                     TABLE_RP[p as usize]
                 )
                 .into()
             } else if q == 1 {
                 format!(
-                    "&implementation::AluOne::<alu::Dec, {}>::new()",
+                    "&implementation::ALUOne::<alu::Dec, {}>::new()",
                     TABLE_RP[p as usize]
                 )
                 .into()
@@ -141,13 +142,13 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             }
         } else if z == 4 {
             format!(
-                "&implementation::AluOne::<alu::Inc, {}>::new()",
+                "&implementation::ALUOne::<alu::Inc, {}>::new()",
                 TABLE_R[y as usize]
             )
             .into()
         } else if z == 5 {
             format!(
-                "&implementation::AluOne::<alu::Dec, {}>::new()",
+                "&implementation::ALUOne::<alu::Dec, {}>::new()",
                 TABLE_R[y as usize]
             )
             .into()
@@ -160,21 +161,21 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         } else if z == 7 {
             #[allow(clippy::if_same_then_else)]
             if y == 0 {
-                "&implementation::AluOne::<alu::RlcA, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::RLCA, operands::A>::new()".into()
             } else if y == 1 {
-                "&implementation::AluOne::<alu::RrcA, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::RRCA, operands::A>::new()".into()
             } else if y == 2 {
-                "&implementation::AluOne::<alu::RlA, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::RLA, operands::A>::new()".into()
             } else if y == 3 {
-                "&implementation::AluOne::<alu::RrA, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::RRA, operands::A>::new()".into()
             } else if y == 4 {
-                "&implementation::AluOne::<alu::Daa, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::DAA, operands::A>::new()".into()
             } else if y == 5 {
-                "&implementation::AluOne::<alu::Cpl, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::CPL, operands::A>::new()".into()
             } else if y == 6 {
-                "&implementation::AluOne::<alu::Scf, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::SCF, operands::A>::new()".into()
             } else if y == 7 {
-                "&implementation::AluOne::<alu::Ccf, operands::A>::new()".into()
+                "&implementation::ALUOne::<alu::CCF, operands::A>::new()".into()
             } else {
                 unreachable!("Y > 7")
             }
@@ -193,7 +194,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
         }
     } else if x == 2 {
         format!(
-            "&implementation::AluTwo::<{}, operands::A, {}>::new()",
+            "&implementation::ALUTwo::<{}, operands::A, {}>::new()",
             TABLE_ALU[y as usize], TABLE_R[z as usize]
         )
         .into()
@@ -204,7 +205,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             } else if y == 4 {
                 "&implementation::Ld::<operands::DerefImm8, operands::A>::new()".into()
             } else if y == 5 {
-                "&implementation::AluTwo::<alu::Add, operands::SP, operands::Off8>::new()".into()
+                "&implementation::ALUTwo::<alu::Add, operands::SP, operands::Off8>::new()".into()
             } else if y == 6 {
                 "&implementation::Ld::<operands::A, operands::DerefImm8>::new()".into()
             } else if y == 7 {
@@ -292,7 +293,7 @@ fn decode_instruction(opcode: u8) -> Cow<'static, str> {
             }
         } else if z == 6 {
             format!(
-                "&implementation::AluTwo::<{}, operands::A, operands::Imm8>::new()",
+                "&implementation::ALUTwo::<{}, operands::A, operands::Imm8>::new()",
                 TABLE_ALU[y as usize]
             )
             .into()
@@ -313,22 +314,22 @@ fn decode_cb_instruction(opcode: u8) -> Cow<'static, str> {
 
     match x {
         0 => format!(
-            "&implementation::AluOne::<{}, {}>::new()",
+            "&implementation::ALUOne::<{}, {}>::new()",
             TABLE_ROT[y as usize], TABLE_R[z as usize]
         )
         .into(),
         1 => format!(
-            "&implementation::AluBit::<alu::Bit, {y}, {}>::new()",
+            "&implementation::ALUBit::<alu::Bit, {y}, {}>::new()",
             TABLE_R[z as usize]
         )
         .into(),
         2 => format!(
-            "&implementation::AluBit::<alu::Res, {y}, {}>::new()",
+            "&implementation::ALUBit::<alu::Res, {y}, {}>::new()",
             TABLE_R[z as usize]
         )
         .into(),
         3 => format!(
-            "&implementation::AluBit::<alu::Set, {y}, {}>::new()",
+            "&implementation::ALUBit::<alu::Set, {y}, {}>::new()",
             TABLE_R[z as usize]
         )
         .into(),

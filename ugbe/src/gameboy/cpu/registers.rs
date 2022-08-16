@@ -1,6 +1,6 @@
 use paste::paste;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Registers {
     a: u8,
     b: u8,
@@ -85,6 +85,22 @@ macro_rules! define_flag {
 }
 
 impl Registers {
+    pub fn new() -> Self {
+        // TODO: Put the right default value for registers
+        Self {
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: 0,
+            h: 0,
+            l: 0,
+            pc: 0,
+            sp: 0,
+        }
+    }
+
     define_r8!(A);
     define_r8!(B);
     define_r8!(C);
@@ -116,4 +132,10 @@ impl Registers {
     define_flag!(N, 6);
     define_flag!(H, 5);
     define_flag!(C, 4);
+}
+
+impl Default for Registers {
+    fn default() -> Self {
+        Self::new()
+    }
 }

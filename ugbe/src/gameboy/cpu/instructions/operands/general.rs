@@ -8,7 +8,7 @@ pub trait Operand: Send + Sync {
     fn str() -> Cow<'static, str>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OperandReadExecutionState<Value>
 where
     Value: Send + Sync + 'static,
@@ -29,7 +29,7 @@ pub trait OperandIn: Operand {
     fn read_value() -> Box<dyn OperandReadExecution<Self::Value> + 'static>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OperandWriteExecutionState {
     Yield(super::super::MemoryOperation),
     Complete,

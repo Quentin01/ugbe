@@ -8,6 +8,7 @@ use super::super::condition::Condition;
 use super::super::operands::{Operand, OperandIn, OperandReadExecution, OperandReadExecutionState};
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Jp<Cond, Op, const WAIT_ONE_EXTRA_CYCLE: bool = true>
 where
     Cond: Condition + Send + Sync + 'static,
@@ -34,7 +35,7 @@ where
     Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        if Cond::STR.len() == 0 {
+        if Cond::is_none() {
             format!("JP {}", Op::str()).into()
         } else {
             format!("JP {}, {}", Cond::STR, Op::str()).into()
@@ -88,7 +89,6 @@ where
                 }
             }
             Self::SettingPC(value) => {
-                let pc = registers.pc();
                 registers.set_pc(value);
 
                 let _ = std::mem::replace(self, Self::Complete);

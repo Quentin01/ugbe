@@ -9,8 +9,13 @@ use super::{
     OperandRegister, OperandWriteExecution, OperandWriteExecutionState,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DecrementAddress {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IncrementAddress {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NoneAddress {}
 
 pub trait ValueToAddress<Value> {
@@ -109,6 +114,7 @@ impl EndianNumeric for u16 {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DerefOperand<Op, Value = u8, AddressOperation = NoneAddress>
 where
     Op: Operand + OperandIn + Send + Sync + 'static,

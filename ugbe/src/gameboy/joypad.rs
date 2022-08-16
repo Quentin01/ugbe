@@ -1,6 +1,6 @@
 use super::components::{InterruptKind, InterruptLine};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Button {
     A,
     B,
@@ -12,13 +12,13 @@ pub enum Button {
     Left,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ButtonState {
     Down,
     Up,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Joypad {
     buttons_state: [ButtonState; 8],
 
@@ -36,11 +36,11 @@ impl Joypad {
     }
 
     fn use_direction_buttons(&self) -> bool {
-        (self.data >> 4) & 0b1 == 0
+        (self.data >> 4) & 0b0001 == 0
     }
 
     fn use_action_buttons(&self) -> bool {
-        (self.data >> 5) & 0b1 == 0
+        (self.data >> 5) & 0b0001 == 0
     }
 
     fn button_to_idx(button: Button) -> usize {
@@ -69,15 +69,15 @@ impl Joypad {
                 let mut nibble = 0;
 
                 if let ButtonState::Up = self.button_state(Button::Right) {
-                    nibble |= 0b1;
+                    nibble |= 0b0001;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::Left) {
-                    nibble |= 0b10;
+                    nibble |= 0b0010;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::Up) {
-                    nibble |= 0b100;
+                    nibble |= 0b0100;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::Down) {
@@ -95,15 +95,15 @@ impl Joypad {
                 let mut nibble = 0;
 
                 if let ButtonState::Up = self.button_state(Button::A) {
-                    nibble |= 0b1;
+                    nibble |= 0b0001;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::B) {
-                    nibble |= 0b10;
+                    nibble |= 0b0010;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::Select) {
-                    nibble |= 0b100;
+                    nibble |= 0b0100;
                 }
 
                 if let ButtonState::Up = self.button_state(Button::Start) {
@@ -145,8 +145,14 @@ impl Joypad {
     }
 
     pub(super) fn write_p1(&mut self, value: u8) {
-        self.data = (self.data & 0b11001111) | (value & 0b00110000);
+        self.data = (self.data & 0b1100_1111) | (value & 0b0011_0000);
 
         self.update_inputs();
+    }
+}
+
+impl Default for Joypad {
+    fn default() -> Self {
+        Self::new()
     }
 }

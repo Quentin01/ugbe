@@ -94,9 +94,9 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
         }
 
         0b10000000
-            | ((self.frequency_sweep.period() & 0b111) << 4)
+            | ((self.frequency_sweep.period() & 0b0111) << 4)
             | (((self.frequency_sweep.direction() == FrequencyDirection::Decrease) as u8) << 3)
-            | (self.frequency_sweep.shift() & 0b111)
+            | (self.frequency_sweep.shift() & 0b0111)
     }
 
     pub fn write_register_0(&mut self, value: u8) {
@@ -104,38 +104,38 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
             return;
         }
 
-        self.frequency_sweep.set_period((value >> 4) & 0b111);
+        self.frequency_sweep.set_period((value >> 4) & 0b0111);
         self.frequency_sweep
             .set_direction(match (value >> 3) & 0b1 == 1 {
                 true => FrequencyDirection::Decrease,
                 false => FrequencyDirection::Increase,
             });
-        self.frequency_sweep.set_shift(value & 0b111);
+        self.frequency_sweep.set_shift(value & 0b0111);
     }
 
     pub fn read_register_1(&self) -> u8 {
-        ((self.wave_pattern_duty & 0b11) << 6) | 0b111111
+        ((self.wave_pattern_duty & 0b0011) << 6) | 0b0011_1111
     }
 
     pub fn write_register_1(&mut self, value: u8) {
-        self.wave_pattern_duty = (value >> 6) & 0b11;
-        self.length_counter.set_value(value & 0b111111);
+        self.wave_pattern_duty = (value >> 6) & 0b0011;
+        self.length_counter.set_value(value & 0b0011_1111);
     }
 
     pub fn read_register_2(&self) -> u8 {
         ((self.volume_envelope.initial() & 0b1111) << 4)
             | (((self.volume_envelope.direction() == EnvelopeDirection::Increase) as u8) << 3)
-            | (self.volume_envelope.period() & 0b111)
+            | (self.volume_envelope.period() & 0b0111)
     }
 
     pub fn write_register_2(&mut self, value: u8) {
         self.volume_envelope.set_initial((value >> 4) & 0b1111);
         self.volume_envelope
-            .set_direction(match (value >> 3) & 0b1 == 1 {
+            .set_direction(match (value >> 3) & 0b1 != 0 {
                 true => EnvelopeDirection::Increase,
                 false => EnvelopeDirection::Decrease,
             });
-        self.volume_envelope.set_period(value & 0b111);
+        self.volume_envelope.set_period(value & 0b0111);
     }
 
     pub fn read_register_3(&self) -> u8 {
@@ -150,16 +150,16 @@ impl<const FREQUENCY_SWEEP: bool> SquareWaveVoice<FREQUENCY_SWEEP> {
     pub fn read_register_4(&self) -> u8 {
         0b10000000
             | ((self.length_counter_enabled as u8) << 6)
-            | 0b00111000
-            | (((self.frequency_sweep.current() >> 8) as u8) & 0b111)
+            | 0b0011_1000
+            | (((self.frequency_sweep.current() >> 8) as u8) & 0b0111)
     }
 
     pub fn write_register_4(&mut self, value: u8) {
         self.length_counter_enabled = (value >> 6) & 0b1 == 1;
         self.frequency_sweep
-            .set_current((((value & 0b111) as u16) << 8) | self.frequency_sweep.current() & 0xFF);
+            .set_current((((value & 0b0111) as u16) << 8) | self.frequency_sweep.current() & 0xFF);
 
-        if (value >> 7) & 0b1 == 1 {
+        if (value >> 7) & 0b1 != 0 {
             self.trigger();
         }
     }
@@ -172,7 +172,7 @@ impl<const FREQUENCY_SWEEP: bool> Voice for SquareWaveVoice<FREQUENCY_SWEEP> {
 
     fn sample(&self) -> VoiceSample {
         let duty = WAV_DUTY_TABLE[self.wave_pattern_duty as usize];
-        let duty = (duty >> (7 - self.duty_position)) & 0b1 == 1;
+        let duty = (duty >> (7 - self.duty_position)) & 0b1 != 0;
 
         let amp = duty as u8;
         VoiceSample::new(amp * self.volume_envelope.current())

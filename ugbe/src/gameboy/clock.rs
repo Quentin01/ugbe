@@ -1,6 +1,7 @@
-pub const FREQUENCY: usize = 4_194_304;
+pub(super) const FREQUENCY: usize = 4_194_304;
 const NANOS_PER_T_CYCLE: f64 = 1_000_000_000f64 / FREQUENCY as f64;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Clock {
     t_cycle_count: usize,
 }
@@ -25,12 +26,18 @@ impl Clock {
     pub fn now(&self) -> Instant {
         Instant {
             t_cycle_count: self.t_cycle_count,
-            extra_nano_seconds: 0.0f64,
+            extra_nano_seconds: 0.0,
         }
     }
 }
 
-#[derive(Clone, Copy)]
+impl Default for Clock {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Instant {
     t_cycle_count: usize,
     extra_nano_seconds: f64,

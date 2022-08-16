@@ -5,6 +5,8 @@ use crate::gameboy::cpu::CpuOperation;
 use super::super::super::registers::Registers;
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EI {}
 
 impl EI {
@@ -29,7 +31,7 @@ enum EIExecution {
 }
 
 impl InstructionExecution for EIExecution {
-    fn next(&mut self, registers: &mut Registers, _: u8) -> InstructionExecutionState {
+    fn next(&mut self, _: &mut Registers, _: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {
             Self::Start => {
                 let _ = std::mem::replace(self, Self::Complete);

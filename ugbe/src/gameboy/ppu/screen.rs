@@ -1,9 +1,9 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FrameBlending {
     Interframe(usize),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ColorPalette {
     off: Color,
     dmg_white: Color,
@@ -68,7 +68,7 @@ impl Default for ColorPalette {
     }
 }
 
-#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Config {
     frame_blending: Option<FrameBlending>,
     color_palette: ColorPalette,
@@ -122,7 +122,7 @@ impl Color {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct Frame {
     pixels: [super::color::Color; Screen::WIDTH * Screen::HEIGHT],
 }
@@ -180,8 +180,7 @@ impl Screen {
 
     pub(super) fn commit_frame(&mut self) {
         self.idx_frame = (self.idx_frame + 1) % self.frames.len();
-        self.frames[self.idx_frame] = self.frame_being_draw;
-        self.frame_being_draw = Frame::new();
+        self.frames[self.idx_frame] = std::mem::replace(&mut self.frame_being_draw, Frame::new());
 
         self.update_pixels()
     }

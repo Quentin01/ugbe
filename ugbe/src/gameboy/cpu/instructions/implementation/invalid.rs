@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use super::super::super::registers::Registers;
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Invalid<const OPCODE: u8, const IS_CB_PREFIXED: bool> {}
 
 impl<const OPCODE: u8, const IS_CB_PREFIXED: bool> Invalid<OPCODE, IS_CB_PREFIXED> {

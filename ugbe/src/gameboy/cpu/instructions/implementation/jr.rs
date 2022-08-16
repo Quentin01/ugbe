@@ -8,6 +8,7 @@ use super::super::condition::Condition;
 use super::super::operands::{Operand, OperandIn, OperandReadExecution, OperandReadExecutionState};
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Jr<Cond, Op>
 where
     Cond: Condition + Send + Sync + 'static,
@@ -34,7 +35,7 @@ where
     Op: Operand<Value = i8> + OperandIn + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        if Cond::STR.len() == 0 {
+        if Cond::is_none() {
             format!("JR {}", Op::str()).into()
         } else {
             format!("JR {}, {}", Cond::STR, Op::str()).into()

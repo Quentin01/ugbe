@@ -65,7 +65,7 @@ impl Sprite {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Oam {
     data: [u8; SPRITE_COUNT * SPRITE_SIZE],
 }

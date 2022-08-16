@@ -7,6 +7,7 @@ pub enum MemoryOperation {
     Write { address: u16, value: u8 },
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Bus {
     data: u8,
 }
@@ -24,12 +25,18 @@ impl Bus {
         &mut self,
         memory_operation: MemoryOperation,
         mmu: &mut impl Mmu,
-        mmu_ctx: &mut super::components::MmuContext,
+        mmu_ctx: &mut super::components::MMUContext,
     ) {
         match memory_operation {
             MemoryOperation::None => {}
             MemoryOperation::Read { address } => self.data = mmu.read_byte(mmu_ctx, address),
             MemoryOperation::Write { address, value } => mmu.write_byte(mmu_ctx, address, value),
         }
+    }
+}
+
+impl Default for Bus {
+    fn default() -> Self {
+        Self::new()
     }
 }

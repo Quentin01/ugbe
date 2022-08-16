@@ -672,7 +672,7 @@ impl Header {
                 match manufacturer_code_range {
                     Some(manufacturer_code_range) => Some(
                         std::str::from_utf8(&rom[manufacturer_code_range.clone()])
-                            .map_err(|e| {
+                            .map_err(|_| {
                                 HeaderError::ManufacturerCodeNotUtf8(
                                     rom[manufacturer_code_range].to_vec(),
                                 )

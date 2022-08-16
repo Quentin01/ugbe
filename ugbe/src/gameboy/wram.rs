@@ -1,6 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorkRam<const SIZE: usize>([u8; SIZE]);
 
 impl<const SIZE: usize> WorkRam<SIZE> {

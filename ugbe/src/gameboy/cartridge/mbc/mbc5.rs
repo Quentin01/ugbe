@@ -1,4 +1,6 @@
-pub struct Mbc {
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MBC {
     ram: bool,
     battery: bool,
     rumble: bool,
@@ -10,7 +12,7 @@ pub struct Mbc {
     rumble_enabled: bool,
 }
 
-impl Mbc {
+impl MBC {
     pub fn new(ram: bool, battery: bool, rumble: bool) -> Self {
         Self {
             ram,
@@ -26,7 +28,7 @@ impl Mbc {
     }
 }
 
-impl super::Mbc for Mbc {
+impl super::MBC for MBC {
     fn has_ram(&self) -> bool {
         self.ram
     }
@@ -79,7 +81,7 @@ impl super::Mbc for Mbc {
                 let nb_banks = (rom.len() / (16 * 1024)) as u16;
 
                 let [_, lsb] = self.rom_bank_n.to_be_bytes();
-                self.rom_bank_n = u16::from_be_bytes([value & 0b1, lsb]) % nb_banks;
+                self.rom_bank_n = u16::from_be_bytes([value & 0b0001, lsb]) % nb_banks;
             }
             0x4000..=0x5FFF => {
                 if self.rumble {

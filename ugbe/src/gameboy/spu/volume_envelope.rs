@@ -75,7 +75,7 @@ impl VolumeEnvelope {
     }
 
     pub fn set_period(&mut self, value: u8) {
-        self.period = value & 0b111;
+        self.period = value & 0b0111;
     }
 
     pub fn direction(&self) -> EnvelopeDirection {

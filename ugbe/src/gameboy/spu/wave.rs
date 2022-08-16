@@ -73,11 +73,11 @@ impl WaveVoice {
     }
 
     pub fn read_register_0(&self) -> u8 {
-        (self.enabled as u8) << 7 | 0b1111111
+        (self.enabled as u8) << 7 | 0b0111_1111
     }
 
     pub fn write_register_0(&mut self, value: u8) {
-        self.enabled = (value >> 7) & 0b1 == 1;
+        self.enabled = (value >> 7) & 0b1 != 0;
     }
 
     pub fn read_register_1(&self) -> u8 {
@@ -89,11 +89,11 @@ impl WaveVoice {
     }
 
     pub fn read_register_2(&self) -> u8 {
-        0b10000000 | ((self.volume_shift & 0b11) << 5) | 0b11111
+        0b1000_0000 | ((self.volume_shift & 0b0011) << 5) | 0b0001_1111
     }
 
     pub fn write_register_2(&mut self, value: u8) {
-        self.volume_shift = (value >> 5) & 0b11;
+        self.volume_shift = (value >> 5) & 0b0011;
     }
 
     pub fn read_register_3(&self) -> u8 {
@@ -105,17 +105,17 @@ impl WaveVoice {
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b10000000
+        0b1000_0000
             | ((self.length_counter_enabled as u8) << 6)
-            | 0b00111000
-            | (((self.frequency >> 8) as u8) & 0b111)
+            | 0b0011_1000
+            | (((self.frequency >> 8) as u8) & 0b0111)
     }
 
     pub fn write_register_4(&mut self, value: u8) {
-        self.length_counter_enabled = (value >> 6) & 0b1 == 1;
-        self.frequency = (((value & 0b111) as u16) << 8) | self.frequency & 0xFF;
+        self.length_counter_enabled = (value >> 6) & 0b1 != 0;
+        self.frequency = (((value & 0b0111) as u16) << 8) | self.frequency & 0xFF;
 
-        if (value >> 7) & 0b1 == 1 {
+        if (value >> 7) & 0b1 != 0 {
             self.trigger();
         }
     }

@@ -12,7 +12,7 @@ pub enum Error {
     ReadError(#[from] io::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BootRom([u8; 0x100]);
 
 impl BootRom {

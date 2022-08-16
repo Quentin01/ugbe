@@ -53,16 +53,17 @@ impl GameboyBuilder {
 
     pub fn build(self) -> Gameboy {
         Gameboy {
-            mmu: mmu::Mmu::new(),
+            mmu: mmu::MMU::new(),
             boot_rom: self.boot_rom,
             cartridge: self.cartridge.into(),
             joypad: joypad::Joypad::new(),
-            ppu: ppu::Ppu::new(self.screen_config),
+            ppu: ppu::PPU::new(self.screen_config),
             spu: spu::Spu::new(),
             cpu: cpu::Cpu::new(),
             bus: bus::Bus::new(),
             interrupt: interrupt::Interrupt::new(),
             work_ram: wram::WorkRam::new(),
+            high_ram: wram::WorkRam::new(),
             timer: timer::Timer::new(),
             clock: clock::Clock::new(),
         }
@@ -70,16 +71,17 @@ impl GameboyBuilder {
 }
 
 pub struct Gameboy {
-    mmu: mmu::Mmu,
+    mmu: mmu::MMU,
     boot_rom: crate::bootrom::BootRom,
     cartridge: cartridge::Cartridge,
     joypad: joypad::Joypad,
-    ppu: ppu::Ppu,
+    ppu: ppu::PPU,
     spu: spu::Spu,
     cpu: cpu::Cpu,
     bus: bus::Bus,
     interrupt: interrupt::Interrupt,
-    work_ram: wram::WorkRam<0x1000>,
+    work_ram: wram::WorkRam<0x2000>,
+    high_ram: wram::WorkRam<0x7F>,
     timer: timer::Timer,
     clock: clock::Clock,
 }
@@ -91,7 +93,7 @@ impl Gameboy {
             self.bus.tick(
                 memory_operation,
                 &mut self.mmu,
-                &mut components::MmuContext {
+                &mut components::MMUContext {
                     joypad: &mut self.joypad,
                     ppu: &mut self.ppu,
                     spu: &mut self.spu,
@@ -100,6 +102,7 @@ impl Gameboy {
                     boot_rom: &mut self.boot_rom,
                     cartridge: &mut self.cartridge,
                     work_ram: &mut self.work_ram,
+                    high_ram: &mut self.high_ram,
                 },
             );
         }

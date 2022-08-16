@@ -1,27 +1,27 @@
-#[derive(Debug)]
-pub struct Mmu {
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MMU {
     boot_rom_enabled: bool,
-    tmp_ram: [u8; 0x10000],
 }
 
-impl Mmu {
+impl MMU {
     pub fn new() -> Self {
         Self {
             boot_rom_enabled: true,
-            tmp_ram: [0; 0x10000],
         }
     }
 }
 
-impl super::components::Mmu for Mmu {
-    fn read_byte(&self, ctx: &super::components::MmuContext, address: u16) -> u8 {
+impl super::components::Mmu for MMU {
+    fn read_byte(&self, ctx: &super::components::MMUContext, address: u16) -> u8 {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => ctx.boot_rom[address as u8],
-            0x0..=0x3FFF => ctx.cartridge.read_rom_bank_0(address - 0x0),
+            0x0..=0x3FFF => ctx.cartridge.read_rom_bank_0(address),
             0x4000..=0x7FFF => ctx.cartridge.read_rom_bank_n(address - 0x4000),
             0x8000..=0x9FFF => ctx.ppu.read_vram_byte(address - 0x8000),
             0xA000..=0xBFFF => ctx.cartridge.read_ram(address - 0xA000),
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000],
+            0xD000..=0xDFFF => ctx.work_ram[address - 0xD000 + 0x1000], // Banked in CGB
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000],
             0xFE00..=0xFE9F => ctx.ppu.read_oam_byte(address - 0xFE00),
             0xFF00 => ctx.joypad.read_p1(),
@@ -76,28 +76,23 @@ impl super::components::Mmu for Mmu {
                     0xFE
                 }
             }
+            0xFF80..=0xFFFE => ctx.high_ram[address - 0xFF80],
             0xFFFF => ctx.interrupt.enable(),
-            // TODO: Handle missing memory mapping
-            _ => self.tmp_ram[address as usize],
+            _ => {
+                // TODO: Handle missing memory mapping
+                0xFF
+            }
         }
     }
 
-    fn write_byte(&mut self, ctx: &mut super::components::MmuContext, address: u16, value: u8) {
-        if address == 0xFF01 {
-            // Write to Serial transfer data SB
-            print!("{}", value as char);
-            // println!("Write to SB: {0x{:02x}}", value);
-        } else if address == 0xFF02 {
-            // Write to serial transfer control SC
-            // println!("Write to SC: 0x{:02x}", value);
-        }
-
+    fn write_byte(&mut self, ctx: &mut super::components::MMUContext, address: u16, value: u8) {
         match address {
             0x0..=0xFF if self.boot_rom_enabled => {}
             0x0..=0x7FFF => ctx.cartridge.write_rom(address, value),
             0x8000..=0x9FFF => ctx.ppu.write_vram_byte(address - 0x8000, value),
             0xA000..=0xBFFF => ctx.cartridge.write_ram(address - 0xA000, value),
             0xC000..=0xCFFF => ctx.work_ram[address - 0xC000] = value,
+            0xD000..=0xDFFF => ctx.work_ram[address - 0xD000 + 0x1000] = value, // Banked in CGB
             0xE000..=0xEFFF => ctx.work_ram[address - 0xE000] = value,
             0xFE00..=0xFE9F => ctx.ppu.write_oam_byte(address - 0xFE00, value),
             0xFF00 => ctx.joypad.write_p1(value),
@@ -138,10 +133,10 @@ impl super::components::Mmu for Mmu {
             0xFF45 => ctx.ppu.write_lyc(value),
             0xFF46 => {
                 // TODO: Properly do the DMA
-
                 let src = (value as u16) * 0x100;
                 for i in 0..=0x9f {
-                    self.write_byte(ctx, 0xFE00 + i, self.read_byte(ctx, src + i));
+                    let value = self.read_byte(ctx, src + i);
+                    ctx.ppu.write_oam_byte(i, value);
                 }
             }
             0xFF47 => ctx.ppu.write_bgp(value),
@@ -150,9 +145,11 @@ impl super::components::Mmu for Mmu {
             0xFF4A => ctx.ppu.write_wy(value),
             0xFF4B => ctx.ppu.write_wx(value),
             0xFF50 => self.boot_rom_enabled = value & 0x1 == 0x0,
+            0xFF80..=0xFFFE => ctx.high_ram[address - 0xFF80] = value,
             0xFFFF => ctx.interrupt.set_enable(value),
-            // TODO: Handle missing memory mapping
-            _ => self.tmp_ram[address as usize] = value,
+            _ => {
+                // TODO: Handle missing memory mapping
+            }
         }
     }
 }

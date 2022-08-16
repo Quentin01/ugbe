@@ -1,4 +1,6 @@
-pub struct Mbc {
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MBC {
     ram: bool,
     battery: bool,
 
@@ -10,7 +12,7 @@ pub struct Mbc {
     mode: bool,
 }
 
-impl Mbc {
+impl MBC {
     pub fn new(ram: bool, battery: bool, multi_cart: bool) -> Self {
         Self {
             ram,
@@ -26,38 +28,38 @@ impl Mbc {
     }
 
     fn zero_bank_n(&self, rom: &[u8]) -> usize {
-        if rom.len() < 1 * 1024 * 1024 {
+        if rom.len() < 1024 * 1024 {
             // ROM is < 1MB
             0
-        } else if rom.len() == 1 * 1024 * 1024 {
+        } else if rom.len() == 1024 * 1024 {
             // ROM is 1MB
             if self.multi_cart {
-                ((self.ram_bank_n & 0b11) << 4) as usize
+                ((self.ram_bank_n & 0b0011) << 4) as usize
             } else {
-                ((self.ram_bank_n & 0b1) << 5) as usize
+                ((self.ram_bank_n & 0b0001) << 5) as usize
             }
         } else if rom.len() == 2 * 1024 * 1024 {
             // ROM is 2MB
-            ((self.ram_bank_n & 0b11) << 5) as usize
+            ((self.ram_bank_n & 0b0011) << 5) as usize
         } else {
             panic!("Invalid ROM size of {} for MBC1", rom.len());
         }
     }
 
     fn high_bank_n(&self, rom: &[u8]) -> usize {
-        if rom.len() < 1 * 1024 * 1024 {
+        if rom.len() < 1024 * 1024 {
             // ROM is < 1MB
             self.rom_bank_n as usize
-        } else if rom.len() == 1 * 1024 * 1024 {
+        } else if rom.len() == 1024 * 1024 {
             // ROM is 1MB
             if self.multi_cart {
-                (((self.ram_bank_n & 0b11) << 4) | (self.rom_bank_n & 0b11001111)) as usize
+                (((self.ram_bank_n & 0b0011) << 4) | (self.rom_bank_n & 0b1100_1111)) as usize
             } else {
-                (((self.ram_bank_n & 0b1) << 5) | (self.rom_bank_n & 0b11011111)) as usize
+                (((self.ram_bank_n & 0b0001) << 5) | (self.rom_bank_n & 0b1101_1111)) as usize
             }
         } else if rom.len() == 2 * 1024 * 1024 {
             // ROM is 2MB
-            (((self.ram_bank_n & 0b11) << 5) | (self.rom_bank_n & 0b10011111)) as usize
+            (((self.ram_bank_n & 0b0011) << 5) | (self.rom_bank_n & 0b1001_1111)) as usize
         } else {
             panic!("Invalid ROM size of {} for MBC1", rom.len());
         }
@@ -81,7 +83,7 @@ impl Mbc {
     }
 }
 
-impl super::Mbc for Mbc {
+impl super::MBC for MBC {
     fn has_ram(&self) -> bool {
         self.ram
     }
@@ -132,16 +134,16 @@ impl super::Mbc for Mbc {
             0x2000..=0x3FFF => {
                 let nb_banks = (rom.len() / (16 * 1024)) as u8;
 
-                if value & 0b11111 == 0 {
+                if value & 0b0001_1111 == 0 {
                     self.rom_bank_n = 1;
                 } else {
                     self.rom_bank_n = value % nb_banks;
                 }
             }
             0x4000..=0x5FFF => {
-                self.ram_bank_n = value & 0b11;
+                self.ram_bank_n = value & 0b0011;
             }
-            0x6000..=0x7FFF => self.mode = value & 0b1 == 0b1,
+            0x6000..=0x7FFF => self.mode = value & 0b001 != 0,
             _ => {}
         }
     }

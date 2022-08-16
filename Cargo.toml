@@ -3,3 +3,6 @@ members = [
     "ugbe",
     "ugbe-sdl2",
 ]
+
+[profile.dev]
+opt-level = 1

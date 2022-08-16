@@ -13,7 +13,7 @@ mod push;
 mod ret;
 mod rst;
 
-pub use alu::{AluBit, AluOne, AluTwo};
+pub use alu::{ALUBit, ALUOne, ALUTwo};
 pub use call::Call;
 pub use di::DI;
 pub use ei::EI;

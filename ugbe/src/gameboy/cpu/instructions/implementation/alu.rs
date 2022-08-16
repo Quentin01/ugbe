@@ -4,24 +4,25 @@ use std::marker::PhantomData;
 use crate::gameboy::cpu::MemoryOperation;
 
 use super::super::super::registers::Registers;
-use super::super::alu::{AluBitOp, AluOneOp, AluOpResult, AluTwoOp};
+use super::super::alu::{ALUOneOp, ALUOpResult, ALUTwoOp, AluBitOp};
 use super::super::operands::{
     Operand, OperandIn, OperandOut, OperandReadExecution, OperandReadExecutionState,
     OperandWriteExecution, OperandWriteExecutionState,
 };
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
-pub struct AluOne<AluOp, Op>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ALUOne<ALUOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
     Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
-    phantom: PhantomData<(AluOp, Op)>,
+    phantom: PhantomData<(ALUOp, Op)>,
 }
 
-impl<AluOp, Op> AluOne<AluOp, Op>
+impl<ALUOp, Op> ALUOne<ALUOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
     Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
@@ -31,36 +32,37 @@ where
     }
 }
 
-impl<AluOp, Op> Instruction for AluOne<AluOp, Op>
+impl<ALUOp, Op> Instruction for ALUOne<ALUOp, Op>
 where
-    AluOp: AluOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUOneOp<<Op as Operand>::Value> + Send + Sync + 'static,
     Op: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        format!("{} {}", AluOp::STR, Op::str()).into()
+        format!("{} {}", ALUOp::STR, Op::str()).into()
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
-        Box::new(AluExecution::<Op, Op, _, true>::Start(
+        Box::new(ALUExecution::<Op, Op, _, true>::Start(
             |_: Option<Op::Value>, value: Op::Value, registers: &mut Registers| {
-                AluOp::execute(value, registers.nf(), registers.hf(), registers.cf())
+                ALUOp::execute(value, registers.nf(), registers.hf(), registers.cf())
             },
         ))
     }
 }
 
-pub struct AluTwo<AluOp, Dst, Src>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ALUTwo<ALUOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
     Src: Operand + OperandIn + Send + Sync + 'static,
     Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
-    phantom: PhantomData<(AluOp, Src, Dst)>,
+    phantom: PhantomData<(ALUOp, Src, Dst)>,
 }
 
-impl<AluOp, Dst, Src> AluTwo<AluOp, Dst, Src>
+impl<ALUOp, Dst, Src> ALUTwo<ALUOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
     Src: Operand + OperandIn + Send + Sync + 'static,
     Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
@@ -71,20 +73,20 @@ where
     }
 }
 
-impl<AluOp, Dst, Src> Instruction for AluTwo<AluOp, Dst, Src>
+impl<ALUOp, Dst, Src> Instruction for ALUTwo<ALUOp, Dst, Src>
 where
-    AluOp: AluTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
+    ALUOp: ALUTwoOp<<Dst as Operand>::Value, <Src as Operand>::Value> + Send + Sync + 'static,
     Src: Operand + OperandIn + Send + Sync + 'static,
     Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        format!("{} {}, {}", AluOp::STR, Dst::str(), Src::str()).into()
+        format!("{} {}, {}", ALUOp::STR, Dst::str(), Src::str()).into()
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
-        Box::new(AluExecution::<Dst, Src, _, false>::Start(
+        Box::new(ALUExecution::<Dst, Src, _, false>::Start(
             |dst: Option<Dst::Value>, src: Src::Value, registers: &mut Registers| {
-                AluOp::execute(
+                ALUOp::execute(
                     dst.expect("As DST_IS_SRC is false, dst should be set"),
                     src,
                     registers.cf(),
@@ -94,17 +96,18 @@ where
     }
 }
 
-pub struct AluBit<AluOp, const BIT_POS: u8, Op>
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ALUBit<ALUOp, const BIT_POS: u8, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    ALUOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
-    phantom: PhantomData<(AluOp, Op)>,
+    phantom: PhantomData<(ALUOp, Op)>,
 }
 
-impl<AluOp, const BIT_POS: u8, Op> AluBit<AluOp, BIT_POS, Op>
+impl<ALUOp, const BIT_POS: u8, Op> ALUBit<ALUOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    ALUOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
     pub const fn new() -> Self {
@@ -114,42 +117,42 @@ where
     }
 }
 
-impl<AluOp, const BIT_POS: u8, Op> Instruction for AluBit<AluOp, BIT_POS, Op>
+impl<ALUOp, const BIT_POS: u8, Op> Instruction for ALUBit<ALUOp, BIT_POS, Op>
 where
-    AluOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
+    ALUOp: AluBitOp<BIT_POS> + Send + Sync + 'static,
     Op: Operand<Value = u8> + OperandIn + OperandOut + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        format!("{} {}, {}", AluOp::STR, BIT_POS, Op::str()).into()
+        format!("{} {}, {}", ALUOp::STR, BIT_POS, Op::str()).into()
     }
 
     fn create_execution(&self) -> Box<dyn InstructionExecution + 'static> {
-        Box::new(AluExecution::<Op, Op, _, true>::Start(
-            |_: Option<Op::Value>, value: Op::Value, _: &mut Registers| AluOp::execute(value),
+        Box::new(ALUExecution::<Op, Op, _, true>::Start(
+            |_: Option<Op::Value>, value: Op::Value, _: &mut Registers| ALUOp::execute(value),
         ))
     }
 }
 
-enum AluExecution<Dst, Src, AluFn, const DST_IS_SRC: bool>
+enum ALUExecution<Dst, Src, ALUFn, const DST_IS_SRC: bool>
 where
     Src: Operand + OperandIn + Send + Sync + 'static,
     Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
-    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value>
+    ALUFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> ALUOpResult<Dst::Value>
         + Send
         + 'static,
 {
-    Start(AluFn),
+    Start(ALUFn),
     ReadingFromSrc {
         operand_read_value: Box<dyn OperandReadExecution<Src::Value> + 'static>,
-        alu_fn: AluFn,
+        alu_fn: ALUFn,
     },
     ReadingFromDst {
         operand_read_value: Box<dyn OperandReadExecution<Dst::Value> + 'static>,
-        alu_fn: AluFn,
+        alu_fn: ALUFn,
         src: Src::Value,
     },
     Do {
-        alu_fn: AluFn,
+        alu_fn: ALUFn,
         dst: Option<Dst::Value>,
         src: Src::Value,
     },
@@ -158,12 +161,12 @@ where
     Complete,
 }
 
-impl<Dst, Src, AluFn, const DST_IS_SRC: bool> InstructionExecution
-    for AluExecution<Dst, Src, AluFn, DST_IS_SRC>
+impl<Dst, Src, ALUFn, const DST_IS_SRC: bool> InstructionExecution
+    for ALUExecution<Dst, Src, ALUFn, DST_IS_SRC>
 where
     Src: Operand + OperandIn + Send + Sync + 'static,
     Dst: Operand + OperandIn + OperandOut + Send + Sync + 'static,
-    AluFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> AluOpResult<Dst::Value>
+    ALUFn: Fn(Option<Dst::Value>, Src::Value, &mut Registers) -> ALUOpResult<Dst::Value>
         + Send
         + Sync
         + 'static,
@@ -180,7 +183,7 @@ where
             };
 
         match std::mem::replace(self, Self::Complete) {
-            AluExecution::Start(alu_fn) => {
+            ALUExecution::Start(alu_fn) => {
                 let _ = std::mem::replace(
                     self,
                     Self::ReadingFromSrc {
@@ -190,7 +193,7 @@ where
                 );
                 self.next(registers, data_bus)
             }
-            AluExecution::ReadingFromSrc {
+            ALUExecution::ReadingFromSrc {
                 mut operand_read_value,
                 alu_fn,
             } => match operand_read_value.next(registers, data_bus) {
@@ -228,7 +231,7 @@ where
                     self.next(registers, data_bus)
                 }
             },
-            AluExecution::ReadingFromDst {
+            ALUExecution::ReadingFromDst {
                 mut operand_read_value,
                 alu_fn,
                 src,
@@ -257,7 +260,7 @@ where
                     self.next(registers, data_bus)
                 }
             },
-            AluExecution::Do { alu_fn, dst, src } => {
+            ALUExecution::Do { alu_fn, dst, src } => {
                 let result = alu_fn(dst, src, registers);
 
                 if let Some(zf) = result.zf {
@@ -284,7 +287,7 @@ where
                     self.next(registers, data_bus)
                 }
             }
-            AluExecution::WritingToDst(mut operand_write_value) => {
+            ALUExecution::WritingToDst(mut operand_write_value) => {
                 match operand_write_value.next(registers, data_bus) {
                     OperandWriteExecutionState::Yield(memory_operation) => {
                         let _ = std::mem::replace(self, Self::WritingToDst(operand_write_value));
@@ -296,7 +299,7 @@ where
                     }
                 }
             }
-            AluExecution::Wait(cycles) => {
+            ALUExecution::Wait(cycles) => {
                 if cycles == 0 {
                     let _ = std::mem::replace(self, Self::Complete);
                     self.next(registers, data_bus)
@@ -305,7 +308,7 @@ where
                     InstructionExecutionState::YieldMemoryOperation(MemoryOperation::None)
                 }
             }
-            AluExecution::Complete => InstructionExecutionState::Complete,
+            ALUExecution::Complete => InstructionExecutionState::Complete,
         }
     }
 }

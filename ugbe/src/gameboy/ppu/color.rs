@@ -38,10 +38,10 @@ impl Index<Id> for Palette {
     fn index(&self, index: Id) -> &Self::Output {
         let index = (index.msb as usize) << 1 | (index.lsb as usize);
         match (self.0 >> (index * 2)) & 0b11 {
-            0 => &Color::Dmg(DMGColor::White),
-            1 => &Color::Dmg(DMGColor::LightGray),
-            2 => &Color::Dmg(DMGColor::DarkGray),
-            3 => &Color::Dmg(DMGColor::Black),
+            0b00 => &Color::Dmg(DMGColor::White),
+            0b01 => &Color::Dmg(DMGColor::LightGray),
+            0b10 => &Color::Dmg(DMGColor::DarkGray),
+            0b11 => &Color::Dmg(DMGColor::Black),
             _ => unreachable!(),
         }
     }

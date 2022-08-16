@@ -9,6 +9,7 @@ use super::super::operands::{
 };
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Pop<Op>
 where
     Op: Operand<Value = u16> + OperandOut + Send + Sync + 'static,

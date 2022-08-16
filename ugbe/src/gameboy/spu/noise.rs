@@ -124,13 +124,13 @@ impl NoiseVoice {
     }
 
     pub fn write_register_1(&mut self, value: u8) {
-        self.length_counter.set_value(value & 0b111111);
+        self.length_counter.set_value(value & 0b0011_1111);
     }
 
     pub fn read_register_2(&self) -> u8 {
         ((self.volume_envelope.initial() & 0b1111) << 4)
             | (((self.volume_envelope.direction() == EnvelopeDirection::Increase) as u8) << 3)
-            | (self.volume_envelope.period() & 0b111)
+            | (self.volume_envelope.period() & 0b0111)
     }
 
     pub fn write_register_2(&mut self, value: u8) {
@@ -140,29 +140,29 @@ impl NoiseVoice {
                 true => EnvelopeDirection::Increase,
                 false => EnvelopeDirection::Decrease,
             });
-        self.volume_envelope.set_period(value & 0b111);
+        self.volume_envelope.set_period(value & 0b0111);
     }
 
     pub fn read_register_3(&self) -> u8 {
         (self.frequency_div_shift & 0b1111) << 4
             | (self.counter_width & 0b1) << 3
-            | (self.frequency_div & 0b111)
+            | (self.frequency_div & 0b0111)
     }
 
     pub fn write_register_3(&mut self, value: u8) {
         self.frequency_div_shift = (value >> 4) & 0b1111;
         self.counter_width = (value >> 3) & 0b1;
-        self.frequency_div = value & 0b111;
+        self.frequency_div = value & 0b0111;
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b10000000 | ((self.length_counter_enabled as u8) << 6) | 0b00111111
+        0b1000_0000 | ((self.length_counter_enabled as u8) << 6) | 0b0011_1111
     }
 
     pub fn write_register_4(&mut self, value: u8) {
-        self.length_counter_enabled = (value >> 6) & 0b1 == 1;
+        self.length_counter_enabled = (value >> 6) & 0b1 != 0;
 
-        if (value >> 7) & 0b1 == 1 {
+        if (value >> 7) & 0b1 != 0 {
             self.trigger();
         }
     }

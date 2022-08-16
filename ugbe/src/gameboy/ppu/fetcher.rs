@@ -1,4 +1,4 @@
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FetcherState {
     GetTile {
         elapsed_cycle: usize,
@@ -42,7 +42,7 @@ impl BackgroundWindowPixel {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BackgroundWindowFetcher {
     tile_map: super::tiling::TileMap,
     position: super::tiling::PixelPosition,
@@ -191,7 +191,7 @@ impl SpritePixel {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SpriteFetcher {
     sprite: super::oam::Sprite,
     state: FetcherState,

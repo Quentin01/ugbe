@@ -1,15 +1,17 @@
-pub struct Mbc {
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MBC {
     ram: bool,
     battery: bool,
 }
 
-impl Mbc {
+impl MBC {
     pub fn new(ram: bool, battery: bool) -> Self {
         Self { ram, battery }
     }
 }
 
-impl super::Mbc for Mbc {
+impl super::MBC for MBC {
     fn has_ram(&self) -> bool {
         self.ram
     }

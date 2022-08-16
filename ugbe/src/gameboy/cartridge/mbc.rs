@@ -4,7 +4,8 @@ mod mbc1;
 mod mbc5;
 mod none;
 
-pub trait Mbc {
+#[allow(clippy::upper_case_acronyms)]
+pub trait MBC {
     fn has_ram(&self) -> bool;
     fn ram_is_battery_buffered(&self) -> bool;
 
@@ -21,18 +22,18 @@ pub trait Mbc {
     fn str(&self) -> Cow<'static, str>;
 }
 
-pub fn new_none(ram: bool, battery: bool) -> Box<dyn Mbc + Send + Sync + 'static> {
-    Box::new(none::Mbc::new(ram, battery))
+pub fn new_none(ram: bool, battery: bool) -> Box<dyn MBC + Send + Sync + 'static> {
+    Box::new(none::MBC::new(ram, battery))
 }
 
 pub fn new_mbc1(
     ram: bool,
     battery: bool,
     multi_cart: bool,
-) -> Box<dyn Mbc + Send + Sync + 'static> {
-    Box::new(mbc1::Mbc::new(ram, battery, multi_cart))
+) -> Box<dyn MBC + Send + Sync + 'static> {
+    Box::new(mbc1::MBC::new(ram, battery, multi_cart))
 }
 
-pub fn new_mbc5(ram: bool, battery: bool, rumble: bool) -> Box<dyn Mbc + Send + Sync + 'static> {
-    Box::new(mbc5::Mbc::new(ram, battery, rumble))
+pub fn new_mbc5(ram: bool, battery: bool, rumble: bool) -> Box<dyn MBC + Send + Sync + 'static> {
+    Box::new(mbc5::MBC::new(ram, battery, rumble))
 }

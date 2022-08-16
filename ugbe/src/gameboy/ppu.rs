@@ -12,7 +12,7 @@ mod registers;
 pub mod screen;
 mod tiling;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Mode {
     OAMScan {
         sprite_buffer: [Option<oam::Sprite>; 10],
@@ -507,14 +507,15 @@ impl Context {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct Ppu {
+pub struct PPU {
     mode: Mode,
     ctx: Context,
     pending_lcd_event: Option<screen::Event>,
 }
 
-impl Debug for Ppu {
+impl Debug for PPU {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -526,7 +527,7 @@ impl Debug for Ppu {
     }
 }
 
-impl Ppu {
+impl PPU {
     pub fn new(screen_config: screen::Config) -> Self {
         Self {
             mode: Mode::default(),
@@ -603,15 +604,15 @@ impl Ppu {
 
     pub fn read_stat(&self) -> u8 {
         let mode_bits = match self.mode {
-            Mode::HBlank { .. } => 0b00,
-            Mode::VBlank { .. } => 0b01,
-            Mode::OAMScan { .. } => 0b10,
-            Mode::Drawing { .. } => 0b11,
+            Mode::HBlank { .. } => 0b0000,
+            Mode::VBlank { .. } => 0b0001,
+            Mode::OAMScan { .. } => 0b0010,
+            Mode::Drawing { .. } => 0b0011,
         };
 
-        let coincidence_flag = if self.ctx.lyc_compare { 0b100 } else { 0b000 };
+        let coincidence_flag = if self.ctx.lyc_compare { 0b0100 } else { 0b0000 };
 
-        mode_bits | coincidence_flag | u8::from(self.ctx.stat) | 0b10000000
+        mode_bits | coincidence_flag | u8::from(self.ctx.stat) | 0b1000_0000
     }
 
     pub fn write_stat(&mut self, value: u8) {
@@ -619,7 +620,7 @@ impl Ppu {
         //   bit 0-1: read only corresponding to the mode
         //   bit 2: read only corresponding to the coincidence flag
         //   bit 7: unused, always set to 1
-        self.ctx.stat = (value & 0b01111000).into()
+        self.ctx.stat = (value & 0b0111_1000).into()
     }
 
     pub fn read_scy(&self) -> u8 {

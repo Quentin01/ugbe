@@ -7,6 +7,7 @@ use super::super::super::registers::Registers;
 use super::super::condition::Condition;
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Ret<Cond, const ENABLE_INTERRUPT: bool = false>
 where
     Cond: Condition + Send + Sync + 'static,
@@ -30,7 +31,7 @@ where
     Cond: Condition + Send + Sync + 'static,
 {
     fn raw_desc(&self) -> Cow<'static, str> {
-        if Cond::STR.len() == 0 {
+        if Cond::is_none() {
             "RET".into()
         } else {
             format!("RET {}", Cond::STR).into()
@@ -63,7 +64,7 @@ where
     fn next(&mut self, registers: &mut Registers, data_bus: u8) -> InstructionExecutionState {
         match std::mem::replace(self, Self::Complete) {
             Self::Start(_) => {
-                if Cond::STR.len() == 0 {
+                if Cond::is_none() {
                     let _ = std::mem::replace(self, Self::PopingLsbPC);
                 } else {
                     let _ = std::mem::replace(self, Self::WaitingOneCycle);

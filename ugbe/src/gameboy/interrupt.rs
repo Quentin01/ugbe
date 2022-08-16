@@ -1,6 +1,6 @@
 use super::components::{InterruptKind, InterruptLine};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Interrupt {
     interrupt_enable: u8,
     interrupt_flags: u8,
@@ -15,19 +15,19 @@ impl Interrupt {
     }
 
     pub fn enable(&self) -> u8 {
-        self.interrupt_enable | 0b11100000
+        self.interrupt_enable | 0b1110_0000
     }
 
     pub fn set_enable(&mut self, value: u8) {
-        self.interrupt_enable = value & 0b11111
+        self.interrupt_enable = value & 0b0001_1111
     }
 
     pub fn flags(&self) -> u8 {
-        self.interrupt_flags | 0b11100000
+        self.interrupt_flags | 0b1110_0000
     }
 
     pub fn set_flags(&mut self, value: u8) {
-        self.interrupt_flags = value & 0b11111
+        self.interrupt_flags = value & 0b0001_1111
     }
 }
 
@@ -57,6 +57,6 @@ impl InterruptLine for Interrupt {
     }
 
     fn flags_not_empty(&self) -> bool {
-        self.interrupt_flags & 0b11111 != 0
+        self.interrupt_flags & 0b0001_1111 != 0
     }
 }

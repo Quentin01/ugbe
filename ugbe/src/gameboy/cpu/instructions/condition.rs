@@ -3,19 +3,29 @@ use super::super::registers::Registers;
 pub trait Condition {
     const STR: &'static str;
 
+    fn is_none() -> bool {
+        false
+    }
+
     fn check(registers: &Registers) -> bool;
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct None {}
 
 impl Condition for None {
     const STR: &'static str = "";
+
+    fn is_none() -> bool {
+        true
+    }
 
     fn check(_: &Registers) -> bool {
         true
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NZ {}
 
 impl Condition for NZ {
@@ -26,6 +36,7 @@ impl Condition for NZ {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Z {}
 
 impl Condition for Z {
@@ -36,6 +47,7 @@ impl Condition for Z {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct NC {}
 
 impl Condition for NC {
@@ -46,6 +58,7 @@ impl Condition for NC {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct C {}
 
 impl Condition for C {

@@ -5,6 +5,7 @@ use crate::gameboy::cpu::MemoryOperation;
 use super::super::super::registers::Registers;
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Rst<const ADDRESS: u8> {}
 
 impl<const ADDRESS: u8> Rst<ADDRESS> {

@@ -7,6 +7,7 @@ use super::super::super::registers::Registers;
 use super::super::operands::{Operand, OperandIn, OperandReadExecution, OperandReadExecutionState};
 use super::super::{Instruction, InstructionExecution, InstructionExecutionState};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Push<Op>
 where
     Op: Operand<Value = u16> + OperandIn + Send + Sync + 'static,
