@@ -2,6 +2,7 @@ use super::frame_sequencer::FrameSequencer;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct LengthCounter<const NB_BITS: u8> {
+    enabled: bool,
     counter: u16,
 }
 
@@ -11,12 +12,13 @@ impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
 
     pub fn new() -> Self {
         Self {
+            enabled: false,
             counter: Self::MAX_LENGTH,
         }
     }
 
     pub fn tick(&mut self, frame_sequencer: &FrameSequencer) {
-        if !frame_sequencer.should_tick_length_counter() {
+        if !frame_sequencer.should_tick_length_counter() || !self.enabled {
             return;
         }
 
@@ -25,9 +27,30 @@ impl<const NB_BITS: u8> LengthCounter<NB_BITS> {
         }
     }
 
-    pub fn trigger(&mut self) {
+    pub fn trigger(&mut self, frame_sequencer: &FrameSequencer) {
         if self.counter == 0 {
             self.counter = Self::MAX_LENGTH;
+
+            if self.enabled && frame_sequencer.should_have_tick_length_counter() {
+                self.counter -= 1;
+            }
+        }
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn enable(&mut self, enabled: bool, frame_sequencer: &FrameSequencer) {
+        let was_enabled = self.enabled;
+        self.enabled = enabled;
+
+        if !was_enabled
+            && self.enabled
+            && frame_sequencer.should_have_tick_length_counter()
+            && self.counter > 0
+        {
+            self.counter -= 1;
         }
     }
 

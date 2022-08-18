@@ -35,6 +35,7 @@ impl TAC {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Timer {
     internal_counter: u16,
+    prev_internal_counter: u16,
     control: TAC,
     modulo: u8,
     counter: u8,
@@ -47,6 +48,7 @@ impl Timer {
     pub fn new() -> Timer {
         Self {
             internal_counter: 0,
+            prev_internal_counter: 0,
             control: 0.into(),
             modulo: 0,
             counter: 0,
@@ -57,6 +59,7 @@ impl Timer {
     }
 
     pub fn tick(&mut self, interrupt_line: &mut dyn InterruptLine) {
+        self.prev_internal_counter = self.internal_counter;
         self.internal_counter = self.internal_counter.wrapping_add(1);
 
         if self.overflow_cycles > 0 {
@@ -91,6 +94,7 @@ impl Timer {
     }
 
     pub fn write_div(&mut self, _: u8) {
+        self.prev_internal_counter = self.internal_counter;
         self.internal_counter = 0;
     }
 
@@ -117,5 +121,18 @@ impl Timer {
 
     pub fn write_tac(&mut self, value: u8) {
         self.control = value.into()
+    }
+
+    pub(super) fn bit_falled(&self, bit_pos: u8) -> bool {
+        let prev_bit = (self.prev_internal_counter >> (bit_pos + 8)) & 0b1 != 0;
+        let current_bit = (self.internal_counter >> (bit_pos + 8)) & 0b1 != 0;
+
+        prev_bit && !current_bit
+    }
+}
+
+impl Default for Timer {
+    fn default() -> Self {
+        Self::new()
     }
 }

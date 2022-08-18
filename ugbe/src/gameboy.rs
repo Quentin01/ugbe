@@ -108,7 +108,10 @@ impl Gameboy {
         }
 
         let screen_event = self.ppu.tick(&mut self.interrupt);
-        self.spu.tick();
+
+        self.timer.tick(&mut self.interrupt);
+
+        self.spu.tick(&self.timer);
 
         let sample_frame = if self.clock.is_apu_cycle() {
             Some(self.spu.sample_frame())
@@ -116,7 +119,6 @@ impl Gameboy {
             None
         };
 
-        self.timer.tick(&mut self.interrupt);
         self.joypad.tick(&mut self.interrupt);
 
         self.clock.tick();

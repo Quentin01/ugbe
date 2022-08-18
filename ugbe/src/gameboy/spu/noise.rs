@@ -10,7 +10,6 @@ pub struct NoiseVoice {
     dac_enabled: bool,
 
     length_counter: LengthCounter<6>,
-    length_counter_enabled: bool,
 
     volume_envelope: VolumeEnvelope,
 
@@ -29,7 +28,6 @@ impl NoiseVoice {
             dac_enabled: false,
 
             length_counter: LengthCounter::new(),
-            length_counter_enabled: false,
 
             volume_envelope: VolumeEnvelope::new(),
 
@@ -43,11 +41,9 @@ impl NoiseVoice {
     }
 
     pub fn tick(&mut self, frame_sequencer: &FrameSequencer) {
-        if self.length_counter_enabled {
-            self.length_counter.tick(frame_sequencer);
-            if self.length_counter.value() == 0 {
-                self.enabled = false;
-            }
+        self.length_counter.tick(frame_sequencer);
+        if self.length_counter.enabled() && self.length_counter.value() == 0 {
+            self.enabled = false;
         }
 
         if !self.enabled {
@@ -85,12 +81,12 @@ impl NoiseVoice {
         }
     }
 
-    fn trigger(&mut self) {
+    fn trigger(&mut self, frame_sequencer: &FrameSequencer) {
         if self.dac_enabled {
             self.enabled = true;
         }
 
-        self.length_counter.trigger();
+        self.length_counter.trigger(frame_sequencer);
 
         self.volume_envelope.trigger();
 
@@ -109,11 +105,11 @@ impl NoiseVoice {
         self.lfsr = 0xFFFF;
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, frame_sequencer: &FrameSequencer) {
         self.enabled = false;
         self.dac_enabled = false;
 
-        self.length_counter_enabled = false;
+        self.length_counter.enable(false, frame_sequencer);
 
         self.volume_envelope.reset();
 
@@ -171,14 +167,16 @@ impl NoiseVoice {
     }
 
     pub fn read_register_4(&self) -> u8 {
-        0b1000_0000 | ((self.length_counter_enabled as u8) << 6) | 0b0011_1111
+        0b1000_0000 | ((self.length_counter.enabled() as u8) << 6) | 0b0011_1111
     }
 
-    pub fn write_register_4(&mut self, value: u8) {
-        self.length_counter_enabled = (value >> 6) & 0b1 != 0;
+    pub fn write_register_4(&mut self, value: u8, frame_sequencer: &FrameSequencer) {
+        self.length_counter
+            .enable((value >> 6) & 0b1 != 0, frame_sequencer);
+        self.enabled &= self.length_counter.value() > 0;
 
         if (value >> 7) & 0b1 != 0 {
-            self.trigger();
+            self.trigger(frame_sequencer);
         }
     }
 }

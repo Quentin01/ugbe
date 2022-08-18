@@ -88,14 +88,14 @@ impl Spu {
         }
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, timer: &super::timer::Timer) {
         if self.enabled {
             self.voice1.tick(&self.frame_sequencer);
             self.voice2.tick(&self.frame_sequencer);
             self.voice3.tick(&self.frame_sequencer);
             self.voice4.tick(&self.frame_sequencer);
 
-            self.frame_sequencer.tick();
+            self.frame_sequencer.tick(timer);
         }
     }
 
@@ -192,6 +192,7 @@ impl Spu {
 
     pub fn write_nr11(&mut self, value: u8) {
         if !self.enabled {
+            self.voice1.write_register_1(value & 0b0011_1111);
             return;
         }
 
@@ -231,7 +232,7 @@ impl Spu {
             return;
         }
 
-        self.voice1.write_register_4(value)
+        self.voice1.write_register_4(value, &self.frame_sequencer)
     }
 
     pub fn read_nr20(&self) -> u8 {
@@ -252,6 +253,8 @@ impl Spu {
 
     pub fn write_nr21(&mut self, value: u8) {
         if !self.enabled {
+            // In DMG mode we allow write to the length counter
+            self.voice2.write_register_1(value & 0b0011_1111);
             return;
         }
 
@@ -291,7 +294,7 @@ impl Spu {
             return;
         }
 
-        self.voice2.write_register_4(value)
+        self.voice2.write_register_4(value, &self.frame_sequencer)
     }
 
     pub fn read_nr30(&self) -> u8 {
@@ -312,6 +315,8 @@ impl Spu {
 
     pub fn write_nr31(&mut self, value: u8) {
         if !self.enabled {
+            // In DMG mode we allow write to the length counter
+            self.voice3.write_register_1(value);
             return;
         }
 
@@ -351,7 +356,7 @@ impl Spu {
             return;
         }
 
-        self.voice3.write_register_4(value)
+        self.voice3.write_register_4(value, &self.frame_sequencer)
     }
 
     pub fn read_wav_ram(&self, address: u16) -> u8 {
@@ -384,6 +389,8 @@ impl Spu {
 
     pub fn write_nr41(&mut self, value: u8) {
         if !self.enabled {
+            // In DMG mode we allow write to the length counter
+            self.voice4.write_register_1(value & 0b0011_1111);
             return;
         }
 
@@ -423,7 +430,7 @@ impl Spu {
             return;
         }
 
-        self.voice4.write_register_4(value)
+        self.voice4.write_register_4(value, &self.frame_sequencer)
     }
 
     pub fn read_nr50(&self) -> u8 {
@@ -481,15 +488,13 @@ impl Spu {
     }
 
     pub fn write_nr52(&mut self, value: u8) {
-        self.enabled = (value >> 7) & 0b1 == 1;
+        let should_enable = (value >> 7) & 0b1 == 1;
 
-        if !self.enabled {
-            self.frame_sequencer.reset();
-
-            self.voice1.reset();
-            self.voice2.reset();
-            self.voice3.reset();
-            self.voice4.reset();
+        if self.enabled && !should_enable {
+            self.voice1.reset(&self.frame_sequencer);
+            self.voice2.reset(&self.frame_sequencer);
+            self.voice3.reset(&self.frame_sequencer);
+            self.voice4.reset(&self.frame_sequencer);
 
             self.left_volume = 0;
             self.right_volume = 0;
@@ -506,6 +511,10 @@ impl Spu {
 
             self.vin_left_enabled = false;
             self.vin_right_enabled = false;
+        } else if !self.enabled && should_enable {
+            self.frame_sequencer.reset();
         }
+
+        self.enabled = should_enable;
     }
 }
